@@ -6,3 +6,6 @@ Don't forget to enable "Stream Processed Data to Ram" in the OCTproZ processing 
 
 # How to install
 Download zip file from [the release section](https://github.com/spectralcode/SocketStreamExtension/releases) and copy all files in the of OCTproZ folder. 
+
+# Simple client application
+For testing purposes you can use [SocketStreamClient](https://github.com/spectralcode/SocketStreamClient)
