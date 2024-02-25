@@ -91,6 +91,7 @@ void SocketStreamExtensionForm::onStopPressed() {
 void SocketStreamExtensionForm::enableButtonsForBroadcastingEnabledState(bool braodcastingActive) {
 	bool isTcpIp = ui->comboBox_mode->currentData().value<int>() == this->toInt(CommunicationMode::TCPIP);
 	bool isActive = braodcastingActive;
+	ui->comboBox_mode->setEnabled(!isActive);
 
 	ui->pushButton_start->setEnabled(!isActive);
 	ui->pushButton_stop->setEnabled(isActive);
