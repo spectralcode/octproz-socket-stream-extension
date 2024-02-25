@@ -1,6 +1,13 @@
 /**
 **  This file is part of SocketStreamExtension for OCTproZ.
-**  Copyright (C) 2020 Miroslav Zabic
+**  Copyright (C) 2020,2024 Miroslav Zabic
+**
+**  SocketStreamExtension is an OCTproZ extension designed for streaming
+**  processed OCT data, supporting inter-process communication via local
+**  socket connections (using Unix Domain Sockets on Unix/Linux and Named
+**  Pipes on Windows) and network communication across computers via TCP/IP.
+**  This enables OCT image data streaming to different applications on the
+**  same computer or to different computers on the same network.
 **
 **  SocketStreamExtension is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -19,52 +26,50 @@
 ** Author:	Miroslav Zabic
 ** Contact:	zabic
 **			at
-**			iqo.uni-hannover.de
+**			spectralcode.de
 ****
 **/
 
 #ifndef BROADCASTER_H
 #define BROADCASTER_H
 
-#define DEFAULT_PORT 1234
-
 #include <QObject>
 #include <QTcpServer>
 #include <QTcpSocket>
+#include <QLocalServer>
+#include <QLocalSocket>
+#include "socketstreamextensionparameters.h"
 
-class Broadcaster : public QObject
-{
+class Broadcaster : public QObject {
 	Q_OBJECT
+
 public:
 	explicit Broadcaster(QObject *parent = nullptr);
 	~Broadcaster();
 
-private:
-	QTcpServer* server;
-	QTcpSocket* socket;
-	QString tag;
-	qint16 port;
-	QHostAddress* hostAddress;
+signals:
+	void listeningEnabled(bool enabled);
+	void error(const QString message);
+	void info(const QString message);
 
 public slots:
-	void onClientConnected();
-	void onClientDisconnected();
-	void readyRead();
 	void startBroadcasting();
 	void stopBroadcasting();
-	void setHostAddress(QString host);
-	void setPort(quint16 port);
+	void configure(const SocketStreamExtensionParameters params);
+	void onClientConnected(); // slot to handle new client connections
+	void onClientDisconnected();
+	void readyRead(); 	// slot to handle incoming data from the client
+	void broadcast(void *buffer, size_t bufferSizeInBytes);
 
-	void broadcast(void* buffer, size_t bufferSizeInBytes);
-
-	//void fillBuffers(void* buffer, unsigned int bitDepth, unsigned int samplesPerLine, unsigned int linesPerFrame, unsigned int framesPerBuffer, unsigned int buffersPerVolume, unsigned int currentBufferNr);
-
-
-signals:
-	void info(QString);
-	void error(QString);
-	void listeningEnabled(bool);
-
+private:
+	QTcpServer *tcpServer;
+	QLocalServer *localServer;
+	QIODevice *socket;
+	SocketStreamExtensionParameters params;
+	QString tag;
+	bool isBroadcasting;
+	QList<QIODevice*> connections;
 };
 
 #endif // BROADCASTER_H
+

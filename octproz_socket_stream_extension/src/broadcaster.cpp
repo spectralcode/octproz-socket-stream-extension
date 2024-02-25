@@ -1,6 +1,13 @@
 /**
 **  This file is part of SocketStreamExtension for OCTproZ.
-**  Copyright (C) 2020 Miroslav Zabic
+**  Copyright (C) 2020,2024 Miroslav Zabic
+**
+**  SocketStreamExtension is an OCTproZ extension designed for streaming
+**  processed OCT data, supporting inter-process communication via local
+**  socket connections (using Unix Domain Sockets on Unix/Linux and Named
+**  Pipes on Windows) and network communication across computers via TCP/IP.
+**  This enables OCT image data streaming to different applications on the
+**  same computer or to different computers on the same network.
 **
 **  SocketStreamExtension is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -19,80 +26,126 @@
 ** Author:	Miroslav Zabic
 ** Contact:	zabic
 **			at
-**			iqo.uni-hannover.de
+**			spectralcode.de
 ****
 **/
 
 #include "broadcaster.h"
+#include "socketstreamextensionparameters.h"
+#include <QHostAddress>
 
-Broadcaster::Broadcaster(QObject *parent) : QObject(parent)
-{
-	this->server = new QTcpServer(this);
-	this->tag = "[Socket Stream Extension] - ";
-	this->socket = nullptr;
-	this->port = DEFAULT_PORT;
-	this->hostAddress = new QHostAddress(QHostAddress::LocalHost);
 
-	connect(this->server, &QTcpServer::newConnection, this, &Broadcaster::onClientConnected);
+Broadcaster::Broadcaster(QObject *parent) : QObject(parent), tcpServer(nullptr), localServer(nullptr), socket(nullptr), tag("[Socket Stream Extension] - "), isBroadcasting(false) {
 }
 
-Broadcaster::~Broadcaster()
-{
+Broadcaster::~Broadcaster() {
 	this->stopBroadcasting();
-	delete this->hostAddress;
 }
 
-void Broadcaster::onClientConnected() {
-	this->socket = this->server->nextPendingConnection();
-	connect(this->socket, &QIODevice::readyRead, this, &Broadcaster::readyRead);
-	connect(this->socket, &QTcpSocket::disconnected, this, &Broadcaster::onClientDisconnected);
-	emit info(this->tag + tr("Client connected!"));
+void Broadcaster::configure(const SocketStreamExtensionParameters params) {
+	this->stopBroadcasting();
+	if (this->tcpServer) {
+		delete this->tcpServer;
+		this->tcpServer = nullptr;
+	}
+	if (this->localServer) {
+		delete this->localServer;
+		this->localServer = nullptr;
+	}
+
+	this->params = params;
+	if (params.mode == CommunicationMode::TCPIP) {
+		this->tcpServer = new QTcpServer(this);
+		connect(this->tcpServer, &QTcpServer::newConnection, this, &Broadcaster::onClientConnected);
+	} else {
+		this->localServer = new QLocalServer(this);
+		connect(this->localServer, &QLocalServer::newConnection, this, &Broadcaster::onClientConnected);
+	}
 }
 
-void Broadcaster::onClientDisconnected() {
-	emit info(this->tag + tr("Client disconnected!"));
-}
-
-void Broadcaster::readyRead() {
-	emit info(this->tag + tr("Received ") + QString::number(this->socket->bytesAvailable()) + tr(" bytes from client."));
-	QByteArray input = socket->readAll();
-	//todo: handle incomming data from client
-}
 
 void Broadcaster::startBroadcasting() {
-	if(this->server->isListening()){
-		emit info(tr("Server is already listening."));
-		return;
+	this->configure(this->params);
+	if (this->params.mode == CommunicationMode::TCPIP && tcpServer) {
+		if (!this->tcpServer->listen(QHostAddress(this->params.ip), this->params.port)) {
+			emit error(this->tcpServer->errorString());
+			return;
+		}
+	} else if (this->params.mode == CommunicationMode::IPC && this->localServer) {
+		if (!this->localServer->listen(this->params.pipeName)) {
+			emit error(this->localServer->errorString());
+			return;
+		}
 	}
-	if(this->server->listen(*this->hostAddress, this->port)){
-		emit info(this->tag + tr("Sever started listening on ip ") + this->server->serverAddress().toString() + tr(" and port ") + QString::number(this->server->serverPort()));
-		emit listeningEnabled(true);
-	}else{
-		QString err = this->server->errorString();
-		emit error(this->tag + tr("Unable to listen on ip ") + this->hostAddress->toString() + tr(" and port ") + QString::number(this->port) + tr(". ") + this->server->errorString());
-		this->listeningEnabled(false);
-	}
+	this->isBroadcasting = true;
+	emit listeningEnabled(true);
 }
 
 void Broadcaster::stopBroadcasting() {
-	if(this->server->isListening()){
-		this->server->close();
-		this->socket = nullptr;
+	if(!this->isBroadcasting){
+		return;
+	}
+	for(QIODevice* connection : qAsConst(this->connections)){
+		connection->close();
+		connection->deleteLater();
+	}
+	this->connections.clear();
+
+	if(this->tcpServer && this->tcpServer->isListening()){
+		this->tcpServer->close();
+		this->isBroadcasting = false;
+	}
+	if(this->localServer && this->localServer->isListening()){
+		this->localServer->close();
+		this->isBroadcasting = false;
+	}
+	if(!this->isBroadcasting){
+		emit info(this->tag + tr("Broadcasting stopped!"));
 		emit listeningEnabled(false);
-		emit info(this->tag + tr("Server stopped listening."));
 	}
 }
 
-void Broadcaster::setHostAddress(QString host){
-	this->hostAddress->setAddress(host);
+void Broadcaster::onClientConnected() {
+	QIODevice* newConnection = nullptr;
+	if (this->params.mode == CommunicationMode::TCPIP && this->tcpServer) {
+		newConnection = this->tcpServer->nextPendingConnection();
+	} else if (this->params.mode == CommunicationMode::IPC && this->localServer) {
+		newConnection = this->localServer->nextPendingConnection();
+	}
+	if (newConnection) {
+		connect(newConnection, &QIODevice::readyRead, this, &Broadcaster::readyRead);
+		// Since QIODevice doesn't have a disconnected signal, we cast based on mode
+		if (this->params.mode == CommunicationMode::TCPIP) {
+			connect(static_cast<QTcpSocket*>(newConnection), &QTcpSocket::disconnected, this, &Broadcaster::onClientDisconnected);
+		} else if (this->params.mode == CommunicationMode::IPC) {
+			connect(static_cast<QLocalSocket*>(newConnection), &QLocalSocket::disconnected, this, &Broadcaster::onClientDisconnected);
+		}
+		connections.append(newConnection);
+		emit info(this->tag + tr("Client connected!"));
+	}
 }
 
-void Broadcaster::setPort(quint16 port) {
-	this->port = port;
+void Broadcaster::onClientDisconnected() {
+	QIODevice* disconnectedDevice  = qobject_cast<QIODevice*>(sender());
+	if(disconnectedDevice ){
+		this->connections.removeAll(disconnectedDevice );
+		disconnectedDevice ->deleteLater();
+		emit info(this->tag + tr("Client disconnected."));
+	}
+}
+
+void Broadcaster::readyRead() {
+	QIODevice* senderDevice = qobject_cast<QIODevice*>(sender());
+	if (!senderDevice) return;
+
+	QByteArray data = senderDevice->readAll();
+	//todo handle incoming data
 }
 
 void Broadcaster::broadcast(void *buffer, size_t bufferSizeInBytes) {
-	if(this->socket != nullptr){
-		this->socket->write(static_cast<const char*>(buffer), bufferSizeInBytes);
+	for(QIODevice* connection : qAsConst(this->connections)){
+		if(connection->isOpen()){
+			connection->write(static_cast<const char*>(buffer), bufferSizeInBytes);
+		}
 	}
 }

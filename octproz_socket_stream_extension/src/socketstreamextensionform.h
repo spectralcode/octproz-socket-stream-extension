@@ -1,6 +1,13 @@
 /**
 **  This file is part of SocketStreamExtension for OCTproZ.
-**  Copyright (C) 2020 Miroslav Zabic
+**  Copyright (C) 2020,2024 Miroslav Zabic
+**
+**  SocketStreamExtension is an OCTproZ extension designed for streaming
+**  processed OCT data, supporting inter-process communication via local
+**  socket connections (using Unix Domain Sockets on Unix/Linux and Named
+**  Pipes on Windows) and network communication across computers via TCP/IP.
+**  This enables OCT image data streaming to different applications on the
+**  same computer or to different computers on the same network.
 **
 **  SocketStreamExtension is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -19,7 +26,7 @@
 ** Author:	Miroslav Zabic
 ** Contact:	zabic
 **			at
-**			iqo.uni-hannover.de
+**			spectralcode.de
 ****
 **/
 
@@ -28,6 +35,7 @@
 
 #define HOST_IP "host_ip"
 #define HOST_PORT "host_port"
+#define PIPE_NAME "pipe_name"
 
 #include <QWidget>
 #include <QCheckBox>
@@ -37,16 +45,13 @@
 #include <QRadioButton>
 #include <QLineEdit>
 
+#include "socketstreamextensionparameters.h"
+
 
 
 namespace Ui {
 class SocketStreamExtensionForm;
 }
-
-struct SocketStreamExtensionParameters {
-	QString ip;
-	qint16 port;
-};
 
 class SocketStreamExtensionForm : public QWidget
 {
@@ -65,6 +70,9 @@ private:
 	void findGuiElements();
 	void connectGuiElementsToUpdateParams();
 	void initValidators();
+	void updateGuiAccordingConnectionMode();
+	int toInt(CommunicationMode mode);
+	CommunicationMode fromInt(int mode);
 
 	SocketStreamExtensionParameters parameters;
 	QList<QCheckBox*> checkBoxes;

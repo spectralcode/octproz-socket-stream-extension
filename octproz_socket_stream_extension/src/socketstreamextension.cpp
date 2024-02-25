@@ -1,6 +1,13 @@
 /**
 **  This file is part of SocketStreamExtension for OCTproZ.
-**  Copyright (C) 2020 Miroslav Zabic
+**  Copyright (C) 2020,2024 Miroslav Zabic
+**
+**  SocketStreamExtension is an OCTproZ extension designed for streaming
+**  processed OCT data, supporting inter-process communication via local
+**  socket connections (using Unix Domain Sockets on Unix/Linux and Named
+**  Pipes on Windows) and network communication across computers via TCP/IP.
+**  This enables OCT image data streaming to different applications on the
+**  same computer or to different computers on the same network.
 **
 **  SocketStreamExtension is free software: you can redistribute it and/or modify
 **  it under the terms of the GNU General Public License as published by
@@ -19,7 +26,7 @@
 ** Author:	Miroslav Zabic
 ** Contact:	zabic
 **			at
-**			iqo.uni-hannover.de
+**			spectralcode.de
 ****
 **/
 
@@ -28,6 +35,9 @@
 
 SocketStreamExtension::SocketStreamExtension() : Extension() {
 	qRegisterMetaType<QVector<qreal> >("QVector<qreal>");
+	qRegisterMetaType<SocketStreamExtensionParameters>("SocketStreamExtensionParameters");
+	qRegisterMetaType<CommunicationMode>("CommunicationMode");
+
 	//init extension
 	this->setType(EXTENSION);
 	this->displayStyle = SIDEBAR_TAB;
@@ -41,14 +51,14 @@ SocketStreamExtension::SocketStreamExtension() : Extension() {
 	connect(this->form, &SocketStreamExtensionForm::paramsChanged, this, &SocketStreamExtension::setParams);
 
 	//setup broadcaster gui connections and move broadcaster to thread
-	this->broadcastSever = new Broadcaster();
-	this->broadcastSever->moveToThread(&broadcasterThread);
-	connect(this->broadcastSever, &Broadcaster::info, this, &SocketStreamExtension::info);
-	connect(this->broadcastSever, &Broadcaster::error, this, &SocketStreamExtension::error);
-	connect(this->broadcastSever, &Broadcaster::listeningEnabled, this->form, &SocketStreamExtensionForm::enableButtonsForBroadcastingEnabledState);
-	connect(this->form, &SocketStreamExtensionForm::startPressed, this->broadcastSever, &Broadcaster::startBroadcasting);
-	connect(this->form, &SocketStreamExtensionForm::stopPressed, this->broadcastSever, &Broadcaster::stopBroadcasting);
-	connect(&broadcasterThread, &QThread::finished, this->broadcastSever, &Broadcaster::deleteLater);
+	this->broadcastServer = new Broadcaster();
+	this->broadcastServer->moveToThread(&broadcasterThread);
+	connect(this->broadcastServer, &Broadcaster::info, this, &SocketStreamExtension::info);
+	connect(this->broadcastServer, &Broadcaster::error, this, &SocketStreamExtension::error);
+	connect(this->broadcastServer, &Broadcaster::listeningEnabled, this->form, &SocketStreamExtensionForm::enableButtonsForBroadcastingEnabledState);
+	connect(this->form, &SocketStreamExtensionForm::startPressed, this->broadcastServer, &Broadcaster::startBroadcasting);
+	connect(this->form, &SocketStreamExtensionForm::stopPressed, this->broadcastServer, &Broadcaster::stopBroadcasting);
+	connect(&broadcasterThread, &QThread::finished, this->broadcastServer, &Broadcaster::deleteLater);
 	broadcasterThread.start();
 }
 
@@ -83,8 +93,7 @@ void SocketStreamExtension::settingsLoaded(QVariantMap settings) {
 
 void SocketStreamExtension::setParams(SocketStreamExtensionParameters params) {
 	this->params = params;
-	QMetaObject::invokeMethod(this->broadcastSever, "setHostAddress", Qt::QueuedConnection, Q_ARG(QString, params.ip));
-	QMetaObject::invokeMethod(this->broadcastSever, "setPort", Qt::QueuedConnection, Q_ARG(quint16, params.port));
+	QMetaObject::invokeMethod(this->broadcastServer, "configure", Qt::QueuedConnection, Q_ARG(SocketStreamExtensionParameters, params));
 	this->storeParameters();
 }
 
@@ -113,7 +122,7 @@ void SocketStreamExtension::processedDataReceived(void* buffer, unsigned int bit
 
 		size_t bytesPerSample = ceil(static_cast<double>(bitDepth) / 8.0);
 		size_t bufferSizeInBytes = samplesPerLine * linesPerFrame * framesPerBuffer * bytesPerSample;
-		QMetaObject::invokeMethod(this->broadcastSever, "broadcast", Qt::QueuedConnection, Q_ARG(void*, buffer), Q_ARG(size_t, bufferSizeInBytes));
+		QMetaObject::invokeMethod(this->broadcastServer, "broadcast", Qt::QueuedConnection, Q_ARG(void*, buffer), Q_ARG(size_t, bufferSizeInBytes));
 	}
 }
 

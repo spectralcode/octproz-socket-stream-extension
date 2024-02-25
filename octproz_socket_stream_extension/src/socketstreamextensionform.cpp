@@ -32,11 +32,22 @@ SocketStreamExtensionForm::SocketStreamExtensionForm(QWidget *parent) :
 {
 	qRegisterMetaType<SocketStreamExtensionParameters >("SocketStreamExtensionParameters");
 	this->ui->setupUi(this);
+
+	//init combo box
+	ui->comboBox_mode->addItem("TCP/IP", QVariant::fromValue(this->toInt(CommunicationMode::TCPIP)));
+	#ifdef Q_OS_WIN
+	ui->comboBox_mode->addItem("IPC - Named Pipes", QVariant::fromValue(this->toInt(CommunicationMode::IPC)));
+	#else
+	ui->comboBox_mode->addItem("IPC - Unix Domain Sockets", QVariant::fromValue(this->toInt(CommunicationMode::IPC)));
+	#endif
+	connect(ui->comboBox_mode, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SocketStreamExtensionForm::updateGuiAccordingConnectionMode);
+	this->updateGuiAccordingConnectionMode();
+
+	//init oter gui elements
 	this->initValidators();
 	this->findGuiElements();
 	this->connectGuiElementsToUpdateParams();
 	this->enableButtonsForBroadcastingEnabledState(false);
-
 
 	connect(this->ui->pushButton_start, &QPushButton::clicked, this, &SocketStreamExtensionForm::onStartPressed);
 	connect(this->ui->pushButton_stop, &QPushButton::clicked, this, &SocketStreamExtensionForm::onStopPressed);
@@ -50,16 +61,21 @@ SocketStreamExtensionForm::~SocketStreamExtensionForm()
 void SocketStreamExtensionForm::setSettings(QVariantMap settings) {
 	this->ui->lineEdit_ip->setText(settings.value(HOST_IP).toString());
 	this->ui->lineEdit_port->setText(settings.value(HOST_PORT).toString());
+	this->ui->lineEdit_pipeName->setText(settings.value(PIPE_NAME).toString());
 }
 
 void SocketStreamExtensionForm::getSettings(QVariantMap* settings) {
 	settings->insert(HOST_IP, this->parameters.ip);
 	settings->insert(HOST_PORT, this->parameters.port);
+	settings->insert(PIPE_NAME, this->parameters.pipeName);
 }
 
 void SocketStreamExtensionForm::updateParams() {
 	this->parameters.ip = this->ui->lineEdit_ip->text();
 	this->parameters.port = this->ui->lineEdit_port->text().toInt();
+	this->parameters.pipeName = this->ui->lineEdit_pipeName->text();
+	this->parameters.mode = this->fromInt(ui->comboBox_mode->currentData().toInt());
+
 	emit paramsChanged(this->parameters);
 }
 
@@ -73,10 +89,18 @@ void SocketStreamExtensionForm::onStopPressed() {
 }
 
 void SocketStreamExtensionForm::enableButtonsForBroadcastingEnabledState(bool braodcastingActive) {
-	this->ui->pushButton_start->setEnabled(!braodcastingActive);
-	this->ui->pushButton_stop->setEnabled(braodcastingActive);
-	this->ui->lineEdit_ip->setEnabled(!braodcastingActive);
-	this->ui->lineEdit_port->setEnabled(!braodcastingActive);
+	bool isTcpIp = ui->comboBox_mode->currentData().value<int>() == this->toInt(CommunicationMode::TCPIP);
+	bool isActive = braodcastingActive;
+
+	ui->pushButton_start->setEnabled(!isActive);
+	ui->pushButton_stop->setEnabled(isActive);
+
+	//enable or disable IP and Port fields based on TCP/IP mode and broadcasting state
+	ui->lineEdit_ip->setEnabled(!isActive && isTcpIp);
+	ui->lineEdit_port->setEnabled(!isActive && isTcpIp);
+
+	//enable or disable Pipe Name field based on IPC mode and broadcasting state
+	ui->lineEdit_pipeName->setEnabled(!isActive && !isTcpIp);
 }
 
 void SocketStreamExtensionForm::findGuiElements(){
@@ -122,4 +146,27 @@ void SocketStreamExtensionForm::initValidators() {
 	//this->ui->lineEdit_ip->setText("000.000.000.000");
 
 	this->ui->lineEdit_port->setValidator(new QIntValidator(0, 65353, this));
+}
+
+void SocketStreamExtensionForm::updateGuiAccordingConnectionMode() {
+	bool isTcpIp = ui->comboBox_mode->currentIndex() == 0;
+	this->ui->lineEdit_ip->setEnabled(isTcpIp);
+	this->ui->lineEdit_port->setEnabled(isTcpIp);
+	this->ui->lineEdit_pipeName->setEnabled(!isTcpIp);
+}
+
+int SocketStreamExtensionForm::toInt(CommunicationMode mode) {
+	return static_cast<int>(mode);
+}
+
+CommunicationMode SocketStreamExtensionForm::fromInt(int mode) {
+	switch(mode) {
+		case static_cast<int>(CommunicationMode::TCPIP):
+			return CommunicationMode::TCPIP;
+		case static_cast<int>(CommunicationMode::IPC):
+			return CommunicationMode::IPC;
+		default:
+			emit error("Invalid mode value for CommunicationMode enum.");
+			return CommunicationMode::TCPIP;
+	}
 }

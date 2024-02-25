@@ -55,7 +55,7 @@ private:
 	bool widgetDisplayed;
 	bool active;
 
-	Broadcaster* broadcastSever;
+	Broadcaster* broadcastServer;
 
 
 
