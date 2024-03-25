@@ -139,7 +139,10 @@ void Broadcaster::readyRead() {
 	if (!senderDevice) return;
 
 	QByteArray data = senderDevice->readAll();
-	//todo handle incoming data
+
+	//handle incoming data
+	QString dataString = QString::fromUtf8(data);
+	emit remoteCommandReceived(dataString);
 }
 
 void Broadcaster::broadcast(void *buffer, size_t bufferSizeInBytes) {

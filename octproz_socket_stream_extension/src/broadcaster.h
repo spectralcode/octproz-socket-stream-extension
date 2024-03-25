@@ -51,6 +51,7 @@ signals:
 	void listeningEnabled(bool enabled);
 	void error(const QString message);
 	void info(const QString message);
+	void remoteCommandReceived(const QString command);
 
 public slots:
 	void startBroadcasting();

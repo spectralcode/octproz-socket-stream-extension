@@ -58,6 +58,7 @@ SocketStreamExtension::SocketStreamExtension() : Extension() {
 	connect(this->broadcastServer, &Broadcaster::listeningEnabled, this->form, &SocketStreamExtensionForm::enableButtonsForBroadcastingEnabledState);
 	connect(this->form, &SocketStreamExtensionForm::startPressed, this->broadcastServer, &Broadcaster::startBroadcasting);
 	connect(this->form, &SocketStreamExtensionForm::stopPressed, this->broadcastServer, &Broadcaster::stopBroadcasting);
+	connect(this->broadcastServer, &Broadcaster::remoteCommandReceived, this, &SocketStreamExtension::handleRemoteCommand);
 	connect(&broadcasterThread, &QThread::finished, this->broadcastServer, &Broadcaster::deleteLater);
 	broadcasterThread.start();
 }
@@ -101,6 +102,16 @@ void SocketStreamExtension::storeParameters() {
 	//update settingsMap, so parameters can be reloaded into gui at next start of application
 	this->form->getSettings(&this->settingsMap);
 	emit storeSettings(this->name, this->settingsMap);
+}
+
+void SocketStreamExtension::handleRemoteCommand(QString command) {
+	if(command == "remote_start") {
+		emit startProcessingRequest();
+	}
+	if(command == "remote_stop") {
+		emit stopProcessingRequest();
+	}
+	emit info("Remote command received: " + command);
 }
 
 
