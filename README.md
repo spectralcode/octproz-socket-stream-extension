@@ -7,5 +7,8 @@ A simple client application for testing purposes can be found here: [SocketStrea
 
 Don't forget to enable "Stream Processed Data to Ram" in the OCTproZ processing settings!
 
+# Example usage with Python
+You can find a minimalistic python script that shows how to connect to SocketStreamExtensions in the [examples folder](examples)
+
 # How to install
 Download zip file from [the release section](https://github.com/spectralcode/SocketStreamExtension/releases) and copy all files into OCTproZ's plugins folder. 
