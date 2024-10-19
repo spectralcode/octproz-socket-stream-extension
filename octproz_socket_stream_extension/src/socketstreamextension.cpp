@@ -105,15 +105,33 @@ void SocketStreamExtension::storeParameters() {
 }
 
 void SocketStreamExtension::handleRemoteCommand(QString command) {
+	command = command.trimmed().toLower();
 	if(command == "remote_start") {
 		emit startProcessingRequest();
 	}
-	if(command == "remote_stop") {
+	else if(command == "remote_stop") {
 		emit stopProcessingRequest();
+	}
+	else if (command.startsWith("load_settings", Qt::CaseInsensitive)) {
+		QStringList parts = command.split(":", QString::SkipEmptyParts);
+		if (parts.size() >= 2) {
+			QString fileName = parts.mid(1).join(":").trimmed();
+			emit loadSettingsFileRequest(fileName);
+		} else {
+			emit error("Invalid load_settings command format.");
+		}
+	}
+	else if (command.startsWith("save_settings", Qt::CaseInsensitive)) {
+		QStringList parts = command.split(":", QString::SkipEmptyParts);
+		if (parts.size() >= 2) {
+			QString fileName = parts.mid(1).join(":").trimmed();
+			emit saveSettingsFileRequest(fileName);
+		} else {
+			emit error("Invalid save_settings command format.");
+		}
 	}
 	emit info("Remote command received: " + command);
 }
-
 
 void SocketStreamExtension::rawDataReceived(void* buffer, unsigned int bitDepth, unsigned int samplesPerLine, unsigned int linesPerFrame, unsigned int framesPerBuffer, unsigned int buffersPerVolume, unsigned int currentBufferNr) {
 	//do nothing here as we do not need the raw data. Q_UNUSED is used to suppress compiler warnings
