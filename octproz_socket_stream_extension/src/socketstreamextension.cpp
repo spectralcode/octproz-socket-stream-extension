@@ -105,7 +105,7 @@ void SocketStreamExtension::storeParameters() {
 }
 
 void SocketStreamExtension::handleRemoteCommand(QString command) {
-	command = command.trimmed().toLower();
+	command = command.toLower();
 	if(command == "remote_start") {
 		emit startProcessingRequest();
 	}

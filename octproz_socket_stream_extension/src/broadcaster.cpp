@@ -85,11 +85,17 @@ void Broadcaster::stopBroadcasting() {
 	if(!this->isBroadcasting){
 		return;
 	}
-	for(QIODevice* connection : qAsConst(this->connections)){
+	for (QIODevice* connection : qAsConst(this->commandConnections)) {
 		connection->close();
 		connection->deleteLater();
 	}
-	this->connections.clear();
+	this->commandConnections.clear();
+
+	for (QIODevice* connection : qAsConst(this->dataConnections)) {
+		connection->close();
+		connection->deleteLater();
+	}
+	this->dataConnections.clear();
 
 	if(this->tcpServer && this->tcpServer->isListening()){
 		this->tcpServer->close();
@@ -120,7 +126,7 @@ void Broadcaster::onClientConnected() {
 		} else if (this->params.mode == CommunicationMode::IPC) {
 			connect(static_cast<QLocalSocket*>(newConnection), &QLocalSocket::disconnected, this, &Broadcaster::onClientDisconnected);
 		}
-		connections.append(newConnection);
+		dataConnections.append(newConnection);
 		emit info(this->tag + tr("Client connected!"));
 	}
 }
@@ -128,7 +134,8 @@ void Broadcaster::onClientConnected() {
 void Broadcaster::onClientDisconnected() {
 	QIODevice* disconnectedDevice  = qobject_cast<QIODevice*>(sender());
 	if(disconnectedDevice ){
-		this->connections.removeAll(disconnectedDevice );
+		this->commandConnections.removeAll(disconnectedDevice );
+		this->dataConnections.removeAll(disconnectedDevice );
 		disconnectedDevice ->deleteLater();
 		emit info(this->tag + tr("Client disconnected."));
 	}
@@ -141,12 +148,31 @@ void Broadcaster::readyRead() {
 	QByteArray data = senderDevice->readAll();
 
 	//handle incoming data
-	QString dataString = QString::fromUtf8(data);
-	emit remoteCommandReceived(dataString);
+	QString dataString = QString::fromUtf8(data).trimmed();
+
+	if (dataString == "ping") {
+		senderDevice->write("pong\n");
+		} else if (dataString == "enable_command_only_mode") {
+			// Move senderDevice to dataConnections
+			if (dataConnections.contains(senderDevice)) {
+				dataConnections.removeAll(senderDevice);
+				commandConnections.append(senderDevice);
+				senderDevice->write("Command mode enabled.\n");
+			}
+		} else if (dataString == "disable_command_only_mode") {
+			// Move senderDevice to commandConnections
+			if (commandConnections.contains(senderDevice)) {
+				commandConnections.removeAll(senderDevice);
+				dataConnections.append(senderDevice);
+				senderDevice->write("Command mode disabled.\n");
+			}
+		} else {
+		emit remoteCommandReceived(dataString);
+	}
 }
 
 void Broadcaster::broadcast(void *buffer, size_t bufferSizeInBytes) {
-	for(QIODevice* connection : qAsConst(this->connections)){
+	for(QIODevice* connection : qAsConst(this->dataConnections)){
 		if(connection->isOpen()){
 			connection->write(static_cast<const char*>(buffer), bufferSizeInBytes);
 		}

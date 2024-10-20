@@ -69,7 +69,8 @@ private:
 	SocketStreamExtensionParameters params;
 	QString tag;
 	bool isBroadcasting;
-	QList<QIODevice*> connections;
+	QList<QIODevice*> commandConnections; // for clients that only want to send commands
+	QList<QIODevice*> dataConnections; // for clients primarily receiving OCT data, with command sending allowed.
 };
 
 #endif // BROADCASTER_H
