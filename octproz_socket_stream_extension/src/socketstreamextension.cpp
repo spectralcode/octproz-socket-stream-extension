@@ -112,6 +112,9 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 	else if(command == "remote_stop") {
 		emit stopProcessingRequest();
 	}
+	else if(command == "remote_record") {
+		emit startRecordingRequest();
+	}
 	else if (command.startsWith("load_settings", Qt::CaseInsensitive)) {
 		QStringList parts = command.split(":", QString::SkipEmptyParts);
 		if (parts.size() >= 2) {

@@ -27,6 +27,7 @@ def main():
     available_commands = [
         'remote_start',
         'remote_stop',
+        'remote_record',
         'load_settings:<file_path>',
         'save_settings:<file_path>',
         'ping',
