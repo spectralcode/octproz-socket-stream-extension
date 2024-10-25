@@ -56,11 +56,13 @@ signals:
 public slots:
 	void startBroadcasting();
 	void stopBroadcasting();
+	void setParams(const SocketStreamExtensionParameters params);
 	void configure(const SocketStreamExtensionParameters params);
 	void onClientConnected(); // slot to handle new client connections
 	void onClientDisconnected();
 	void readyRead(); 	// slot to handle incoming data from the client
-	void broadcast(void *buffer, size_t bufferSizeInBytes);
+	//void broadcast(void *buffer, size_t bufferSizeInBytes);
+	void broadcast(void *buffer, quint32 bufferSizeInBytes, quint16 framesPerBuffer, quint16 frameWidth, quint16 frameHeight, quint8 bitDepth);
 
 private:
 	QTcpServer *tcpServer;

@@ -93,8 +93,11 @@ void SocketStreamExtension::settingsLoaded(QVariantMap settings) {
 }
 
 void SocketStreamExtension::setParams(SocketStreamExtensionParameters params) {
+//	if(!(params.ip == this->params.ip && params.mode == this->params.mode && params.pipeName == this->params.pipeName && params.port == this->params.port)){
+		
+//	}
 	this->params = params;
-	QMetaObject::invokeMethod(this->broadcastServer, "configure", Qt::QueuedConnection, Q_ARG(SocketStreamExtensionParameters, params));
+	QMetaObject::invokeMethod(this->broadcastServer, "setParams", Qt::QueuedConnection, Q_ARG(SocketStreamExtensionParameters, params));
 	this->storeParameters();
 }
 
@@ -152,9 +155,28 @@ void SocketStreamExtension::processedDataReceived(void* buffer, unsigned int bit
 		Q_UNUSED(buffersPerVolume)
 		Q_UNUSED(currentBufferNr)
 
+		// Calculate bytes per sample
 		size_t bytesPerSample = ceil(static_cast<double>(bitDepth) / 8.0);
+
+		// Calculate total buffer size in bytes
 		size_t bufferSizeInBytes = samplesPerLine * linesPerFrame * framesPerBuffer * bytesPerSample;
-		QMetaObject::invokeMethod(this->broadcastServer, "broadcast", Qt::QueuedConnection, Q_ARG(void*, buffer), Q_ARG(size_t, bufferSizeInBytes));
+
+		// Cast bufferSizeInBytes to quint32 (ensure it does not exceed quint32 limits)
+		quint32 quintBufferSizeInBytes = static_cast<quint32>(bufferSizeInBytes);
+
+		// Cast other parameters to required types
+		quint16 quintFramesPerBuffer = static_cast<quint16>(framesPerBuffer);
+		quint16 quintFrameWidth = static_cast<quint16>(samplesPerLine);
+		quint16 quintFrameHeight = static_cast<quint16>(linesPerFrame);
+		quint8 quintBitDepth = static_cast<quint8>(bitDepth);
+
+		// Invoke the broadcast method with all required parameters
+		QMetaObject::invokeMethod(this->broadcastServer, "broadcast", Qt::QueuedConnection,
+								  Q_ARG(void*, buffer),
+								  Q_ARG(quint32, quintBufferSizeInBytes),
+								  Q_ARG(quint16, quintFramesPerBuffer),
+								  Q_ARG(quint16, quintFrameWidth),
+								  Q_ARG(quint16, quintFrameHeight),
+								  Q_ARG(quint8, quintBitDepth));
 	}
 }
-

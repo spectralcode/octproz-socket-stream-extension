@@ -18,6 +18,7 @@ struct SocketStreamExtensionParameters {
 	QString pipeName;
 	QString ip;
 	quint16 port;
+	bool sendHeader;
 };
 Q_DECLARE_METATYPE(SocketStreamExtensionParameters)
 

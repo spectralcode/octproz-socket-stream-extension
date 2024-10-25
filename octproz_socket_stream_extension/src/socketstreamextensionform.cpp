@@ -62,12 +62,14 @@ void SocketStreamExtensionForm::setSettings(QVariantMap settings) {
 	this->ui->lineEdit_ip->setText(settings.value(HOST_IP).toString());
 	this->ui->lineEdit_port->setText(settings.value(HOST_PORT).toString());
 	this->ui->lineEdit_pipeName->setText(settings.value(PIPE_NAME).toString());
+	this->ui->checkBox_header->setChecked(settings.value(SEND_HEADER).toBool());
 }
 
 void SocketStreamExtensionForm::getSettings(QVariantMap* settings) {
 	settings->insert(HOST_IP, this->parameters.ip);
 	settings->insert(HOST_PORT, this->parameters.port);
 	settings->insert(PIPE_NAME, this->parameters.pipeName);
+	settings->insert(SEND_HEADER, this->parameters.sendHeader);
 }
 
 void SocketStreamExtensionForm::updateParams() {
@@ -75,6 +77,7 @@ void SocketStreamExtensionForm::updateParams() {
 	this->parameters.port = this->ui->lineEdit_port->text().toInt();
 	this->parameters.pipeName = this->ui->lineEdit_pipeName->text();
 	this->parameters.mode = this->fromInt(ui->comboBox_mode->currentData().toInt());
+	this->parameters.sendHeader = this->ui->checkBox_header->isChecked();
 
 	emit paramsChanged(this->parameters);
 }

@@ -36,6 +36,7 @@
 #define HOST_IP "host_ip"
 #define HOST_PORT "host_port"
 #define PIPE_NAME "pipe_name"
+#define SEND_HEADER "send_header"
 
 #include <QWidget>
 #include <QCheckBox>

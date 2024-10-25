@@ -33,7 +33,10 @@
 #include "broadcaster.h"
 #include "socketstreamextensionparameters.h"
 #include <QHostAddress>
+#include <QDataStream>
 
+
+static quint32 startIdentifier = 299792458; // identifier (magic number) for synchronization on client side
 
 Broadcaster::Broadcaster(QObject *parent) : QObject(parent), tcpServer(nullptr), localServer(nullptr), socket(nullptr), tag("[Socket Stream Extension] - "), isBroadcasting(false) {
 }
@@ -42,7 +45,7 @@ Broadcaster::~Broadcaster() {
 	this->stopBroadcasting();
 }
 
-void Broadcaster::configure(const SocketStreamExtensionParameters params) {
+void Broadcaster::configure(const SocketStreamExtensionParameters params) {	
 	this->stopBroadcasting();
 	if (this->tcpServer) {
 		delete this->tcpServer;
@@ -111,6 +114,10 @@ void Broadcaster::stopBroadcasting() {
 	}
 }
 
+void Broadcaster::setParams(const SocketStreamExtensionParameters params) {
+	this->params = params;
+}
+
 void Broadcaster::onClientConnected() {
 	QIODevice* newConnection = nullptr;
 	if (this->params.mode == CommunicationMode::TCPIP && this->tcpServer) {
@@ -171,10 +178,26 @@ void Broadcaster::readyRead() {
 	}
 }
 
-void Broadcaster::broadcast(void *buffer, size_t bufferSizeInBytes) {
-	for(QIODevice* connection : qAsConst(this->dataConnections)){
-		if(connection->isOpen()){
-			connection->write(static_cast<const char*>(buffer), bufferSizeInBytes);
+void Broadcaster::broadcast(void *buffer, quint32 bufferSizeInBytes, quint16 framesPerBuffer, quint16 frameWidth, quint16 frameHeight, quint8 bitDepth) {
+	QByteArray frameData;
+	QDataStream stream(&frameData, QIODevice::WriteOnly);
+	stream.setByteOrder(QDataStream::BigEndian);
+
+	// write header information to stream
+	if(this->params.sendHeader) {
+		stream << startIdentifier << bufferSizeInBytes << frameWidth << frameHeight << bitDepth;
+	}
+
+	// append the actual OCT image data
+	frameData.append(static_cast<const char*>(buffer), bufferSizeInBytes);
+
+	// send the data to clients
+	for (QIODevice* connection : qAsConst(this->dataConnections)) {
+		if (connection->isOpen()) {
+			qint64 bytesWritten = connection->write(frameData);
+			if (bytesWritten == -1) {
+				emit error(this->tag + tr("Failed to write to client: %1").arg(connection->errorString()));
+			}
 		}
 	}
 }
