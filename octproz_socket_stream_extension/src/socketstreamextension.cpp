@@ -31,6 +31,7 @@
 **/
 
 #include "socketstreamextension.h"
+#include <math.h>
 
 
 SocketStreamExtension::SocketStreamExtension() : Extension() {
