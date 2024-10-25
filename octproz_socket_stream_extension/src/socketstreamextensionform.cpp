@@ -139,7 +139,7 @@ void SocketStreamExtensionForm::connectGuiElementsToUpdateParams() {
 }
 
 void SocketStreamExtensionForm::initValidators() {
-	QString ipRange = "(([ 0]+)|([ 0]*[0-9] *)|([0-9][0-9] )|([ 0][0-9][0-9])|(1[0-9][0-9])|([2][0-4][0-9])|(25[0-5]))";
+	QString ipRange = "(([0]{1,3})|([0]{0,2}[1-9]{1})|([0]{0,1}[1-9]{1}[0-9]{1})|(1[0-9]{2})|([2][0-4][0-9])|(25[0-5]))";
 	QRegExp ipRegex("^" + ipRange
 					+ "\\." + ipRange
 					+ "\\." + ipRange
