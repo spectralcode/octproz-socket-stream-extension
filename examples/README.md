@@ -24,6 +24,7 @@
 ### 4. `octproz_websocket_client.html`
 
 - **Description:** WebSocket client that runs in a browser
+- **Link:** [OCTproZ WebSocket Demo](https://spectralcode.github.io/SocketStreamExtension/examples/octproz_websocket_client.html)
 - **Features:**
   - Connects to the OCTproZ WebSocket server and displays real-time OCT images.
   - Allows manipulation of displayed images through zoom, translation, and rotation.
