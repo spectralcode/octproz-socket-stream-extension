@@ -19,10 +19,11 @@
 ** Author:	Miroslav Zabic
 ** Contact:	zabic
 **			at
-**			iqo.uni-hannover.de
+**			spectralcode.de
 ****
 **/
 
+// socketstreamextensionform.cpp
 #include "socketstreamextensionform.h"
 #include "ui_socketstreamextensionform.h"
 
@@ -30,20 +31,17 @@ SocketStreamExtensionForm::SocketStreamExtensionForm(QWidget *parent) :
 	QWidget(parent),
 	ui(new Ui::SocketStreamExtensionForm)
 {
-	qRegisterMetaType<SocketStreamExtensionParameters >("SocketStreamExtensionParameters");
+	qRegisterMetaType<SocketStreamExtensionParameters>("SocketStreamExtensionParameters");
 	this->ui->setupUi(this);
 
 	//init combo box
 	ui->comboBox_mode->addItem("TCP/IP", QVariant::fromValue(this->toInt(CommunicationMode::TCPIP)));
-	#ifdef Q_OS_WIN
-	ui->comboBox_mode->addItem("IPC - Named Pipes", QVariant::fromValue(this->toInt(CommunicationMode::IPC)));
-	#else
-	ui->comboBox_mode->addItem("IPC - Unix Domain Sockets", QVariant::fromValue(this->toInt(CommunicationMode::IPC)));
-	#endif
+	ui->comboBox_mode->addItem("IPC - Local Sockets", QVariant::fromValue(this->toInt(CommunicationMode::IPC)));
+	ui->comboBox_mode->addItem("WebSocket", QVariant::fromValue(this->toInt(CommunicationMode::WebSocket))); // Neuer Modus
 	connect(ui->comboBox_mode, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &SocketStreamExtensionForm::updateGuiAccordingConnectionMode);
 	this->updateGuiAccordingConnectionMode();
 
-	//init oter gui elements
+	//init other gui elements
 	this->initValidators();
 	this->findGuiElements();
 	this->connectGuiElementsToUpdateParams();
@@ -63,6 +61,12 @@ void SocketStreamExtensionForm::setSettings(QVariantMap settings) {
 	this->ui->lineEdit_port->setText(settings.value(HOST_PORT).toString());
 	this->ui->lineEdit_pipeName->setText(settings.value(PIPE_NAME).toString());
 	this->ui->checkBox_header->setChecked(settings.value(SEND_HEADER).toBool());
+	// Setzen des Kommunikationsmodus
+	int mode = settings.value("mode").toInt();
+	int index = ui->comboBox_mode->findData(QVariant::fromValue(mode));
+	if (index != -1) {
+		ui->comboBox_mode->setCurrentIndex(index);
+	}
 }
 
 void SocketStreamExtensionForm::getSettings(QVariantMap* settings) {
@@ -70,6 +74,7 @@ void SocketStreamExtensionForm::getSettings(QVariantMap* settings) {
 	settings->insert(HOST_PORT, this->parameters.port);
 	settings->insert(PIPE_NAME, this->parameters.pipeName);
 	settings->insert(SEND_HEADER, this->parameters.sendHeader);
+	settings->insert("mode", this->toInt(this->parameters.mode));
 }
 
 void SocketStreamExtensionForm::updateParams() {
@@ -83,7 +88,7 @@ void SocketStreamExtensionForm::updateParams() {
 }
 
 void SocketStreamExtensionForm::onStartPressed() {
-	this->updateParams(); //todo: check if this is necessary here
+	this->updateParams();
 	emit startPressed();
 }
 
@@ -93,18 +98,19 @@ void SocketStreamExtensionForm::onStopPressed() {
 
 void SocketStreamExtensionForm::enableButtonsForBroadcastingEnabledState(bool braodcastingActive) {
 	bool isTcpIp = ui->comboBox_mode->currentData().value<int>() == this->toInt(CommunicationMode::TCPIP);
+	bool isWebSocket = ui->comboBox_mode->currentData().value<int>() == this->toInt(CommunicationMode::WebSocket);
 	bool isActive = braodcastingActive;
 	ui->comboBox_mode->setEnabled(!isActive);
 
 	ui->pushButton_start->setEnabled(!isActive);
 	ui->pushButton_stop->setEnabled(isActive);
 
-	//enable or disable IP and Port fields based on TCP/IP mode and broadcasting state
-	ui->lineEdit_ip->setEnabled(!isActive && isTcpIp);
-	ui->lineEdit_port->setEnabled(!isActive && isTcpIp);
+	//enable or disable IP and Port fields based on TCP/IP or WebSocket mode and broadcasting state
+	ui->lineEdit_ip->setEnabled(!isActive && (isTcpIp || isWebSocket));
+	ui->lineEdit_port->setEnabled(!isActive && (isTcpIp || isWebSocket));
 
 	//enable or disable Pipe Name field based on IPC mode and broadcasting state
-	ui->lineEdit_pipeName->setEnabled(!isActive && !isTcpIp);
+	ui->lineEdit_pipeName->setEnabled(!isActive && !isTcpIp && !isWebSocket);
 }
 
 void SocketStreamExtensionForm::findGuiElements(){
@@ -114,7 +120,6 @@ void SocketStreamExtensionForm::findGuiElements(){
 	this->comboBoxes = this->findChildren<QComboBox*>();
 	this->radioButtons = this->findChildren<QRadioButton*>();
 	this->lineEdits = this->findChildren<QLineEdit*>();
-
 }
 
 void SocketStreamExtensionForm::connectGuiElementsToUpdateParams() {
@@ -146,17 +151,16 @@ void SocketStreamExtensionForm::initValidators() {
 					+ "\\." + ipRange + "$");
 	QRegExpValidator *ipValidator = new QRegExpValidator(ipRegex, this);
 	this->ui->lineEdit_ip->setValidator(ipValidator);
-	//this->ui->lineEdit_ip->setInputMask("000.000.000.000");
-	//this->ui->lineEdit_ip->setText("000.000.000.000");
 
-	this->ui->lineEdit_port->setValidator(new QIntValidator(0, 65353, this));
+	this->ui->lineEdit_port->setValidator(new QIntValidator(0, 65535, this));
 }
 
 void SocketStreamExtensionForm::updateGuiAccordingConnectionMode() {
-	bool isTcpIp = ui->comboBox_mode->currentIndex() == 0;
-	this->ui->lineEdit_ip->setEnabled(isTcpIp);
-	this->ui->lineEdit_port->setEnabled(isTcpIp);
-	this->ui->lineEdit_pipeName->setEnabled(!isTcpIp);
+	bool isTcpIp = ui->comboBox_mode->currentData().value<int>() == this->toInt(CommunicationMode::TCPIP);
+	bool isWebSocket = ui->comboBox_mode->currentData().value<int>() == this->toInt(CommunicationMode::WebSocket);
+	this->ui->lineEdit_ip->setEnabled(isTcpIp || isWebSocket);
+	this->ui->lineEdit_port->setEnabled(isTcpIp || isWebSocket);
+	this->ui->lineEdit_pipeName->setEnabled(!isTcpIp && !isWebSocket);
 }
 
 int SocketStreamExtensionForm::toInt(CommunicationMode mode) {
@@ -169,6 +173,8 @@ CommunicationMode SocketStreamExtensionForm::fromInt(int mode) {
 			return CommunicationMode::TCPIP;
 		case static_cast<int>(CommunicationMode::IPC):
 			return CommunicationMode::IPC;
+		case static_cast<int>(CommunicationMode::WebSocket):
+			return CommunicationMode::WebSocket;
 		default:
 			emit error("Invalid mode value for CommunicationMode enum.");
 			return CommunicationMode::TCPIP;

@@ -10,7 +10,8 @@
 // and TCP/IP communication --> QTcpSocket
 enum class CommunicationMode {
 	IPC,
-	TCPIP
+	TCPIP,
+	WebSocket
 };
 
 struct SocketStreamExtensionParameters {

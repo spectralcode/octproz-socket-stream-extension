@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>OCTproZ WebSocket Client</title>
+	<style>
+		body {
+			margin: 0;
+			overflow: hidden;
+			position: relative;
+			font-family: Arial, sans-serif;
+			background-color: #333;
+			color: #fff;
+		}
+		#controls {
+			position: absolute;
+			top: 10px;
+			left: 10px;
+			background-color: rgba(0, 0, 0, 0.7);
+			padding: 10px;
+			border-radius: 5px;
+			z-index: 1000;
+		}
+		#controls input {
+			margin: 5px 0;
+			padding: 5px;
+			width: 200px;
+			border: none;
+			border-radius: 3px;
+		}
+		#controls button {
+			margin: 5px 0;
+			padding: 5px 10px;
+			width: 100px;
+			border: none;
+			border-radius: 3px;
+			background-color: #555;
+			color: #fff;
+			cursor: pointer;
+		}
+		#controls button:hover {
+			background-color: #777;
+		}
+		#info {
+			position: absolute;
+			top: 10px;
+			right: 10px;
+			background-color: rgba(0, 0, 0, 0.7);
+			padding: 10px;
+			border-radius: 5px;
+			max-width: 300px;
+			z-index: 1000;
+		}
+		#fpsInfo {
+			margin-top: 0px;
+			padding: 0px;
+			border-radius: 3px;
+			text-align: left;
+			font-weight: normal;
+			color: white;
+			background-color: rgba(0, 0, 0, 0.5);
+			font-size: 16px; 
+		}
+		#status {
+			position: absolute;
+			bottom: 10px;
+			left: 0px;
+			padding: 0px 10px;
+			border-radius: 3px;
+			text-align: center;
+			font-weight: bold;
+			color: #fff;
+			background-color: red; 
+			z-index: 1000;
+		}
+		#canvasContainer {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			width: 100vw;
+			height: 100vh;
+			background-color: #000;
+			position: relative;
+		}
+		#canvas {
+			cursor: grab;
+			background-color: #000;
+			user-select: none; /* Prevent text selection while dragging */
+		}
+		#rotateBtn {
+			margin-top: 10px;
+			width: 100px;
+		}
+	</style>
+</head>
+<body>
+	<div id="controls">
+		<label for="serverIp">Server IP:</label><br>
+		<input type="text" id="serverIp" placeholder="e.g., 127.0.0.1" value="127.0.0.1"><br>
+		<label for="serverPort">Port:</label><br>
+		<input type="number" id="serverPort" placeholder="e.g., 1234" value="1234"><br>
+		<button id="connectBtn">Connect</button><br>
+		<button id="disconnectBtn" disabled>Disconnect</button><br>
+		<button id="startBtn">Start</button><br>
+		<button id="stopBtn">Stop</button><br>
+		<button id="rotateBtn" disabled>Rotate 90°</button><br>
+	</div>
+
+	<div id="info">
+		<h3>Header Information</h3>
+		<p id="headerInfo">No Data</p>
+		<div id="fpsInfo">FPS: 0.00</div>
+	</div>
+
+	<div id="canvasContainer">
+		<canvas id="canvas" width="1920" height="1080"></canvas>
+	</div>
+	<div id="status">Disconnected</div>
+
+	<script>
+		const canvas = document.getElementById('canvas');
+		const ctx = canvas.getContext('2d');
+		const fpsInfo = document.getElementById('fpsInfo');
+		const headerInfo = document.getElementById('headerInfo');
+		const rotateBtn = document.getElementById('rotateBtn');
+		const status = document.getElementById('status');
+
+		const serverIpInput = document.getElementById('serverIp');
+		const serverPortInput = document.getElementById('serverPort');
+		const connectBtn = document.getElementById('connectBtn');
+		const disconnectBtn = document.getElementById('disconnectBtn');
+		const startBtn = document.getElementById('startBtn');
+		const stopBtn = document.getElementById('stopBtn');
+
+		let frameCount = 0;
+		let currentFps = 0;
+
+		let socket = null;
+
+		let scale = 1;
+		let translatePos = { x: 0, y: 0 };
+		let isDragging = false;
+		let dragStart = { x: 0, y: 0 };
+		let rotation = 0; // Rotation angle in degrees
+
+		let lastImageData = null;
+
+		// Offscreen canvas to store image data
+		const offscreenCanvas = document.createElement('canvas');
+		const offscreenCtx = offscreenCanvas.getContext('2d');
+
+		// Setup FPS Timer
+		setInterval(() => {
+			currentFps = frameCount;
+			frameCount = 0;
+			fpsInfo.textContent = `FPS: ${currentFps.toFixed(2)}`;
+		}, 1000);
+
+		// Event Listener for Connect Button
+		connectBtn.addEventListener('click', () => {
+			const ip = serverIpInput.value.trim();
+			const port = serverPortInput.value.trim();
+
+			if (!ip || !port) {
+				alert('Please enter Server IP and Port.');
+				return;
+			}
+
+			const wsUrl = `ws://${ip}:${port}`;
+			socket = new WebSocket(wsUrl);
+
+			socket.binaryType = 'arraybuffer';
+
+			socket.onopen = () => {
+				console.log('WebSocket connection established');
+				connectBtn.disabled = true;
+				disconnectBtn.disabled = false;
+				rotateBtn.disabled = false;
+				status.textContent = 'Connected';
+				status.style.backgroundColor = 'green';
+			};
+
+			socket.onmessage = (event) => {
+				const arrayBuffer = event.data;
+				const uint8Array = new Uint8Array(arrayBuffer);
+
+				// First 13 bytes are the header
+				if (uint8Array.length < 13) {
+					console.warn('Insufficient data for header');
+					return;
+				}
+
+				// Extract header information
+				const dataView = new DataView(uint8Array.buffer);
+				const startIdentifier = dataView.getUint32(0, false);
+				const bufferSizeInBytes = dataView.getUint32(4, false);
+				const frameWidth = dataView.getUint16(8, false);
+				const frameHeight = dataView.getUint16(10, false);
+				const bitDepth = uint8Array[12];
+
+				// Check Magic Number
+				const MAGIC_NUMBER = 299792458; 
+				if (startIdentifier !== MAGIC_NUMBER) {
+					console.warn('Magic Number does not match');
+					return;
+				}
+
+				// Display header information
+				headerInfo.innerHTML = `
+					<strong>Start Identifier:</strong> ${startIdentifier}<br>
+					<strong>Buffer Size (Bytes):</strong> ${bufferSizeInBytes}<br>
+					<strong>Frame Width:</strong> ${frameWidth}<br>
+					<strong>Frame Height:</strong> ${frameHeight}<br>
+					<strong>Bit Depth:</strong> ${bitDepth}
+				`;
+
+				// Assume remaining bytes are image data
+				const imageDataArray = uint8Array.slice(13);
+
+				// Normalize image data based on bit depth
+				let normalizedData;
+				if (bitDepth <= 8) {
+					normalizedData = imageDataArray;
+				} else if (bitDepth <= 12) {
+					// 12-bit to 8-bit by shifting right 4 bits
+					const uint16Array = new Uint16Array(imageDataArray.buffer, imageDataArray.byteOffset, imageDataArray.length / 2);
+					normalizedData = new Uint8ClampedArray(uint16Array.length);
+					for (let i = 0; i < uint16Array.length; i++) {
+						normalizedData[i] = uint16Array[i] >> 4;
+					}
+				} else if (bitDepth <= 16) {
+					// 16-bit to 8-bit by shifting right 8 bits
+					const uint16Array = new Uint16Array(imageDataArray.buffer, imageDataArray.byteOffset, imageDataArray.length / 2);
+					normalizedData = new Uint8ClampedArray(uint16Array.length);
+					for (let i = 0; i < uint16Array.length; i++) {
+						normalizedData[i] = uint16Array[i] >> 8;
+					}
+				} else {
+					console.warn('Unsupported bit depth:', bitDepth);
+					return;
+				}
+
+				// Create ImageData for grayscale
+				const imgData = new ImageData(frameWidth, frameHeight);
+				for(let i = 0; i < frameWidth * frameHeight; i++){
+					const val = normalizedData[i] || 0; // Ensure no undefined
+					imgData.data[i * 4] = val; // R
+					imgData.data[i * 4 + 1] = val; // G
+					imgData.data[i * 4 + 2] = val; // B
+					imgData.data[i * 4 + 3] = 255; // A
+				}
+
+				// Draw to offscreen canvas
+				offscreenCanvas.width = frameWidth;
+				offscreenCanvas.height = frameHeight;
+				offscreenCtx.putImageData(imgData, 0, 0);
+
+				// Store the last image data
+				lastImageData = offscreenCanvas;
+
+				// Draw the image with current transformations
+				draw();
+
+				frameCount++;
+			};
+
+			socket.onclose = () => {
+				console.log('WebSocket connection closed');
+				connectBtn.disabled = false;
+				disconnectBtn.disabled = true;
+				rotateBtn.disabled = true;
+				status.textContent = 'Disconnected';
+				status.style.backgroundColor = 'red';
+			};
+
+			socket.onerror = (error) => {
+				console.error('WebSocket error:', error);
+				alert('WebSocket error occurred. Check console for details.');
+			};
+		});
+
+		// Event Listener for Disconnect Button
+		disconnectBtn.addEventListener('click', () => {
+			if (socket) {
+				socket.close();
+				socket = null;
+			}
+		});
+
+		// Event Listener for Start Button
+		startBtn.addEventListener('click', () => {
+			if (socket && socket.readyState === WebSocket.OPEN) {
+				socket.send('remote_start');
+				stopBtn.disabled = false; // Keeping Stop enabled as per user request
+			}
+		});
+
+		// Event Listener for Stop Button
+		stopBtn.addEventListener('click', () => {
+			if (socket && socket.readyState === WebSocket.OPEN) {
+				socket.send('remote_stop');
+				stopBtn.disabled = true;
+			}
+		});
+
+		// Event Listener for Rotate Button
+		rotateBtn.addEventListener('click', () => {
+			rotation = (rotation + 90) % 360;
+			draw(); // Redraw with new rotation
+		});
+
+		// Mouse Events for Dragging
+		canvas.addEventListener('mousedown', (event) => {
+			isDragging = true;
+			dragStart.x = event.clientX - translatePos.x;
+			dragStart.y = event.clientY - translatePos.y;
+			canvas.style.cursor = 'grabbing';
+		});
+
+		canvas.addEventListener('mousemove', (event) => {
+			if (isDragging) {
+				translatePos.x = event.clientX - dragStart.x;
+				translatePos.y = event.clientY - dragStart.y;
+				draw(); // Redraw with new translation
+			}
+		});
+
+		canvas.addEventListener('mouseup', () => {
+			isDragging = false;
+			canvas.style.cursor = 'grab';
+		});
+
+		canvas.addEventListener('mouseleave', () => {
+			isDragging = false;
+			canvas.style.cursor = 'grab';
+		});
+
+		// Wheel Event for Zooming
+		canvas.addEventListener('wheel', (event) => {
+			event.preventDefault();
+			const delta = Math.sign(event.deltaY);
+			const zoomFactor = 0.1;
+			if (delta < 0) {
+				scale += zoomFactor;
+			} else {
+				scale = Math.max(scale - zoomFactor, 0.1);
+			}
+			draw(); // Redraw with new scale
+		});
+
+		// Function to handle drawing with current transformations
+		function draw() {
+			if (!lastImageData) return;
+
+			// Clear canvas
+			ctx.save();
+			ctx.setTransform(1, 0, 0, 1, 0, 0);
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			ctx.restore();
+
+			// Apply transformations
+			ctx.save();
+
+			// Disable interpolation to display actual pixels values
+			ctx.imageSmoothingEnabled = false;
+
+			// Move to center of canvas plus any translation
+			ctx.translate(canvas.width / 2 + translatePos.x, canvas.height / 2 + translatePos.y);
+
+			// Apply scaling and rotation
+			ctx.scale(scale, scale);
+			ctx.rotate(rotation * Math.PI / 180);
+
+			// Draw the image centered at origin
+			ctx.drawImage(lastImageData, -lastImageData.width / 2, -lastImageData.height / 2);
+
+			ctx.restore();
+		}
+	</script>
+</body>
+</html>

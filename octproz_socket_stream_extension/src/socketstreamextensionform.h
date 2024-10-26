@@ -48,8 +48,6 @@
 
 #include "socketstreamextensionparameters.h"
 
-
-
 namespace Ui {
 class SocketStreamExtensionForm;
 }
@@ -83,7 +81,6 @@ private:
 	QList<QRadioButton*> radioButtons;
 	QList<QLineEdit*> lineEdits;
 
-
 public slots:
 	void updateParams();
 	void onStartPressed();
@@ -92,12 +89,10 @@ public slots:
 
 signals:
 	void paramsChanged(SocketStreamExtensionParameters params);
-
 	void error(QString);
 	void info(QString);
 	void startPressed();
 	void stopPressed();
-
 };
 
 #endif // SOCKETSTREAMEXTENSIONFORM_H

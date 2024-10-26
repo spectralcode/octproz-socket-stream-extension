@@ -38,6 +38,10 @@
 #include <QTcpSocket>
 #include <QLocalServer>
 #include <QLocalSocket>
+#include <QWebSocketServer>
+#include <QWebSocket>
+#include <QList>
+#include <QByteArray>
 #include "socketstreamextensionparameters.h"
 
 class Broadcaster : public QObject {
@@ -58,22 +62,30 @@ public slots:
 	void stopBroadcasting();
 	void setParams(const SocketStreamExtensionParameters params);
 	void configure(const SocketStreamExtensionParameters params);
-	void onClientConnected(); // slot to handle new client connections
+	void onClientConnected();
+	void onWebSocketConnected();
+	void onWebSocketDisconnected();
 	void onClientDisconnected();
-	void readyRead(); 	// slot to handle incoming data from the client
-	//void broadcast(void *buffer, size_t bufferSizeInBytes);
+	void onBinaryMessageReceived(QByteArray message); // slot to handle binary WebSocket messages
+	void onTextMessageReceived(QString message); // slot to handle text WebSocket messages
+	void readyRead(); // slot to handle incoming data from the client
 	void broadcast(void *buffer, quint32 bufferSizeInBytes, quint16 framesPerBuffer, quint16 frameWidth, quint16 frameHeight, quint8 bitDepth);
 
 private:
 	QTcpServer *tcpServer;
 	QLocalServer *localServer;
-	QIODevice *socket;
+	QWebSocketServer *webSocketServer;
+	QList<QTcpSocket*> tcpConnections;
+	QList<QLocalSocket*> localConnections;
+	QList<QWebSocket*> webSocketConnections;
 	SocketStreamExtensionParameters params;
 	QString tag;
 	bool isBroadcasting;
+
 	QList<QIODevice*> commandConnections; // for clients that only want to send commands
 	QList<QIODevice*> dataConnections; // for clients primarily receiving OCT data, with command sending allowed.
+
+	static quint32 startIdentifier;
 };
 
 #endif // BROADCASTER_H
-

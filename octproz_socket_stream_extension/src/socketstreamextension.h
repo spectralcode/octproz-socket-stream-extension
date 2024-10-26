@@ -19,7 +19,7 @@
 ** Author:	Miroslav Zabic
 ** Contact:	zabic
 **			at
-**			iqo.uni-hannover.de
+**			spectralcode.de
 ****
 **/
 
@@ -56,7 +56,6 @@ private:
 	bool active;
 
 	Broadcaster* broadcastServer;
-
 
 
 public slots:

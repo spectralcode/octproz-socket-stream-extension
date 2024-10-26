@@ -30,9 +30,9 @@
 ****
 **/
 
+
 #include "socketstreamextension.h"
 #include <math.h>
-
 
 SocketStreamExtension::SocketStreamExtension() : Extension() {
 	qRegisterMetaType<QVector<qreal> >("QVector<qreal>");
@@ -94,9 +94,6 @@ void SocketStreamExtension::settingsLoaded(QVariantMap settings) {
 }
 
 void SocketStreamExtension::setParams(SocketStreamExtensionParameters params) {
-//	if(!(params.ip == this->params.ip && params.mode == this->params.mode && params.pipeName == this->params.pipeName && params.port == this->params.port)){
-		
-//	}
 	this->params = params;
 	QMetaObject::invokeMethod(this->broadcastServer, "setParams", Qt::QueuedConnection, Q_ARG(SocketStreamExtensionParameters, params));
 	this->storeParameters();

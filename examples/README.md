@@ -17,5 +17,14 @@
 - **Description:** Extends the previous script by processing and displaying OCT images in real-time.
 - **Features:**
   - Displays images using `matplotlib`.
-  - Shows FPS (Frames Per Second) information on the plot.
+  - Shows FPS information on the plot.
   - Handles different image dimensions and bit depths (configurable in the script).
+
+
+### 4. `octproz_websocket_client.html`
+
+- **Description:** WebSocket client that runs in a browser
+- **Features:**
+  - Connects to the OCTproZ WebSocket server and displays real-time OCT images.
+  - Allows manipulation of displayed images through zoom, translation, and rotation.
+  - Shows FPS.

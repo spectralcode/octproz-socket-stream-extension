@@ -34,52 +34,85 @@
 #include "socketstreamextensionparameters.h"
 #include <QHostAddress>
 #include <QDataStream>
+#include <QDebug>
 
+quint32 Broadcaster::startIdentifier = 299792458; // identifier (magic number) for synchronization on client side
 
-static quint32 startIdentifier = 299792458; // identifier (magic number) for synchronization on client side
-
-Broadcaster::Broadcaster(QObject *parent) : QObject(parent), tcpServer(nullptr), localServer(nullptr), socket(nullptr), tag("[Socket Stream Extension] - "), isBroadcasting(false) {
+Broadcaster::Broadcaster(QObject *parent) : QObject(parent), tcpServer(nullptr), localServer(nullptr), webSocketServer(nullptr), tag("[Socket Stream Extension] - "), isBroadcasting(false) {
 }
 
 Broadcaster::~Broadcaster() {
 	this->stopBroadcasting();
 }
 
-void Broadcaster::configure(const SocketStreamExtensionParameters params) {	
+void Broadcaster::configure(const SocketStreamExtensionParameters params) {
 	this->stopBroadcasting();
 	if (this->tcpServer) {
-		delete this->tcpServer;
+		this->tcpServer->deleteLater();
 		this->tcpServer = nullptr;
 	}
 	if (this->localServer) {
-		delete this->localServer;
+		this->localServer->deleteLater();
 		this->localServer = nullptr;
+	}
+	if (this->webSocketServer) {
+		this->webSocketServer->deleteLater();
+		this->webSocketServer = nullptr;
 	}
 
 	this->params = params;
-	if (params.mode == CommunicationMode::TCPIP) {
-		this->tcpServer = new QTcpServer(this);
-		connect(this->tcpServer, &QTcpServer::newConnection, this, &Broadcaster::onClientConnected);
-	} else {
-		this->localServer = new QLocalServer(this);
-		connect(this->localServer, &QLocalServer::newConnection, this, &Broadcaster::onClientConnected);
+	switch (this->params.mode) {
+		case CommunicationMode::TCPIP:
+			this->tcpServer = new QTcpServer(this);
+			connect(this->tcpServer, &QTcpServer::newConnection, this, &Broadcaster::onClientConnected);
+			break;
+		case CommunicationMode::IPC:
+			this->localServer = new QLocalServer(this);
+			connect(this->localServer, &QLocalServer::newConnection, this, &Broadcaster::onClientConnected);
+			break;
+		case CommunicationMode::WebSocket:
+			this->webSocketServer = new QWebSocketServer(QStringLiteral("Broadcaster WebSocket Server"), QWebSocketServer::NonSecureMode, this);
+			connect(this->webSocketServer, &QWebSocketServer::newConnection, this, &Broadcaster::onWebSocketConnected);
+			break;
+		default:
+			qWarning() << "Unknown Communication Mode!";
+			break;
 	}
 }
 
-
 void Broadcaster::startBroadcasting() {
 	this->configure(this->params);
-	if (this->params.mode == CommunicationMode::TCPIP && tcpServer) {
-		if (!this->tcpServer->listen(QHostAddress(this->params.ip), this->params.port)) {
-			emit error(this->tcpServer->errorString());
+
+	switch (this->params.mode) {
+		case CommunicationMode::TCPIP:
+			if (tcpServer) {
+				if (!this->tcpServer->listen(QHostAddress(this->params.ip), this->params.port)) {
+					emit error(this->tcpServer->errorString());
+					return;
+				}
+			}
+			break;
+		case CommunicationMode::IPC:
+			if (localServer) {
+				if (!this->localServer->listen(this->params.pipeName)) {
+					emit error(this->localServer->errorString());
+					return;
+				}
+			}
+			break;
+		case CommunicationMode::WebSocket:
+			if (webSocketServer) {
+				if (!this->webSocketServer->listen(QHostAddress::Any, this->params.port)) { // WebSocket typically listens on a port
+					emit error(this->webSocketServer->errorString());
+					return;
+				}
+			}
+			break;
+		default:
+			qWarning() << "Unknown Communication Mode!";
 			return;
-		}
-	} else if (this->params.mode == CommunicationMode::IPC && this->localServer) {
-		if (!this->localServer->listen(this->params.pipeName)) {
-			emit error(this->localServer->errorString());
-			return;
-		}
 	}
+
 	this->isBroadcasting = true;
 	emit listeningEnabled(true);
 }
@@ -100,12 +133,22 @@ void Broadcaster::stopBroadcasting() {
 	}
 	this->dataConnections.clear();
 
+	for (QWebSocket* ws : qAsConst(this->webSocketConnections)) {
+		ws->close();
+		ws->deleteLater();
+	}
+	this->webSocketConnections.clear();
+
 	if(this->tcpServer && this->tcpServer->isListening()){
 		this->tcpServer->close();
 		this->isBroadcasting = false;
 	}
 	if(this->localServer && this->localServer->isListening()){
 		this->localServer->close();
+		this->isBroadcasting = false;
+	}
+	if(this->webSocketServer && this->webSocketServer->isListening()){
+		this->webSocketServer->close();
 		this->isBroadcasting = false;
 	}
 	if(!this->isBroadcasting){
@@ -125,16 +168,42 @@ void Broadcaster::onClientConnected() {
 	} else if (this->params.mode == CommunicationMode::IPC && this->localServer) {
 		newConnection = this->localServer->nextPendingConnection();
 	}
+
 	if (newConnection) {
 		connect(newConnection, &QIODevice::readyRead, this, &Broadcaster::readyRead);
 		// Since QIODevice doesn't have a disconnected signal, we cast based on mode
 		if (this->params.mode == CommunicationMode::TCPIP) {
 			connect(static_cast<QTcpSocket*>(newConnection), &QTcpSocket::disconnected, this, &Broadcaster::onClientDisconnected);
+			tcpConnections.append(static_cast<QTcpSocket*>(newConnection));
 		} else if (this->params.mode == CommunicationMode::IPC) {
 			connect(static_cast<QLocalSocket*>(newConnection), &QLocalSocket::disconnected, this, &Broadcaster::onClientDisconnected);
+			localConnections.append(static_cast<QLocalSocket*>(newConnection));
 		}
 		dataConnections.append(newConnection);
 		emit info(this->tag + tr("Client connected!"));
+	}
+}
+
+void Broadcaster::onWebSocketConnected() {
+	if (!webSocketServer) return;
+
+	QWebSocket *client = webSocketServer->nextPendingConnection();
+
+	connect(client, &QWebSocket::binaryMessageReceived, this, &Broadcaster::onBinaryMessageReceived);
+	connect(client, &QWebSocket::textMessageReceived, this, &Broadcaster::onTextMessageReceived);
+	connect(client, &QWebSocket::disconnected, this, &Broadcaster::onWebSocketDisconnected);
+
+	webSocketConnections.append(client);
+
+	emit info(this->tag + tr("WebSocket client connected!"));
+}
+
+void Broadcaster::onWebSocketDisconnected() {
+	QWebSocket* disconnectedClient = qobject_cast<QWebSocket*>(sender());
+	if (disconnectedClient) {
+		webSocketConnections.removeAll(disconnectedClient);
+		disconnectedClient->deleteLater();
+		emit info(this->tag + tr("WebSocket client disconnected."));
 	}
 }
 
@@ -145,6 +214,67 @@ void Broadcaster::onClientDisconnected() {
 		this->dataConnections.removeAll(disconnectedDevice );
 		disconnectedDevice ->deleteLater();
 		emit info(this->tag + tr("Client disconnected."));
+	}
+}
+
+void Broadcaster::onBinaryMessageReceived(QByteArray message) {
+	// Handle binary messages from WebSocket clients
+	// Hier gehen wir davon aus, dass binäre Nachrichten Befehle oder ähnliche Daten enthalten
+	QString dataString = QString::fromUtf8(message).trimmed();
+
+	if (dataString == "ping") {
+		QWebSocket* webSocket = qobject_cast<QWebSocket*>(sender());
+		if (webSocket) {
+			webSocket->sendTextMessage("pong\n");
+		}
+	} else if (dataString == "enable_command_only_mode") {
+		// Move webSocket to commandConnections
+		QWebSocket* webSocket = qobject_cast<QWebSocket*>(sender());
+		if (webSocket && webSocketConnections.contains(webSocket)) {
+			webSocketConnections.removeAll(webSocket);
+			commandConnections.append(reinterpret_cast<QIODevice*>(webSocket));
+			webSocket->sendTextMessage("Command mode enabled.\n");
+		}
+	} else if (dataString == "disable_command_only_mode") {
+		// Move webSocket to dataConnections
+		QWebSocket* webSocket = qobject_cast<QWebSocket*>(sender());
+		if (webSocket && commandConnections.contains(reinterpret_cast<QIODevice*>(webSocket))) {
+			commandConnections.removeAll(reinterpret_cast<QIODevice*>(webSocket));
+			webSocketConnections.append(webSocket);
+			webSocket->sendTextMessage("Command mode disabled.\n");
+		}
+	} else {
+		emit remoteCommandReceived(dataString);
+	}
+}
+
+void Broadcaster::onTextMessageReceived(QString message) {
+	// Handle text messages from WebSocket clients
+	QString dataString = message.trimmed();
+
+	if (dataString == "ping") {
+		QWebSocket* webSocket = qobject_cast<QWebSocket*>(sender());
+		if (webSocket) {
+			webSocket->sendTextMessage("pong\n");
+		}
+	} else if (dataString == "enable_command_only_mode") {
+		// Move webSocket to commandConnections
+		QWebSocket* webSocket = qobject_cast<QWebSocket*>(sender());
+		if (webSocket && webSocketConnections.contains(webSocket)) {
+			webSocketConnections.removeAll(webSocket);
+			commandConnections.append(reinterpret_cast<QIODevice*>(webSocket));
+			webSocket->sendTextMessage("Command mode enabled.\n");
+		}
+	} else if (dataString == "disable_command_only_mode") {
+		// Move webSocket to dataConnections
+		QWebSocket* webSocket = qobject_cast<QWebSocket*>(sender());
+		if (webSocket && commandConnections.contains(reinterpret_cast<QIODevice*>(webSocket))) {
+			commandConnections.removeAll(reinterpret_cast<QIODevice*>(webSocket));
+			webSocketConnections.append(webSocket);
+			webSocket->sendTextMessage("Command mode disabled.\n");
+		}
+	} else {
+		emit remoteCommandReceived(dataString);
 	}
 }
 
@@ -159,21 +289,21 @@ void Broadcaster::readyRead() {
 
 	if (dataString == "ping") {
 		senderDevice->write("pong\n");
-		} else if (dataString == "enable_command_only_mode") {
-			// Move senderDevice to dataConnections
-			if (dataConnections.contains(senderDevice)) {
-				dataConnections.removeAll(senderDevice);
-				commandConnections.append(senderDevice);
-				senderDevice->write("Command mode enabled.\n");
-			}
-		} else if (dataString == "disable_command_only_mode") {
-			// Move senderDevice to commandConnections
-			if (commandConnections.contains(senderDevice)) {
-				commandConnections.removeAll(senderDevice);
-				dataConnections.append(senderDevice);
-				senderDevice->write("Command mode disabled.\n");
-			}
-		} else {
+	} else if (dataString == "enable_command_only_mode") {
+		// Move senderDevice to commandConnections
+		if (dataConnections.contains(senderDevice)) {
+			dataConnections.removeAll(senderDevice);
+			commandConnections.append(senderDevice);
+			senderDevice->write("Command mode enabled.\n");
+		}
+	} else if (dataString == "disable_command_only_mode") {
+		// Move senderDevice to dataConnections
+		if (commandConnections.contains(senderDevice)) {
+			commandConnections.removeAll(senderDevice);
+			dataConnections.append(senderDevice);
+			senderDevice->write("Command mode disabled.\n");
+		}
+	} else {
 		emit remoteCommandReceived(dataString);
 	}
 }
@@ -191,7 +321,7 @@ void Broadcaster::broadcast(void *buffer, quint32 bufferSizeInBytes, quint16 fra
 	// append the actual OCT image data
 	frameData.append(static_cast<const char*>(buffer), bufferSizeInBytes);
 
-	// send the data to clients
+	// send the data to TCP/IP and IPC clients
 	for (QIODevice* connection : qAsConst(this->dataConnections)) {
 		if (connection->isOpen()) {
 			qint64 bytesWritten = connection->write(frameData);
@@ -200,4 +330,12 @@ void Broadcaster::broadcast(void *buffer, quint32 bufferSizeInBytes, quint16 fra
 			}
 		}
 	}
+
+	// send the data to WebSocket clients
+	for (QWebSocket* ws : qAsConst(this->webSocketConnections)) {
+		if (ws->isValid()) {
+			ws->sendBinaryMessage(frameData);
+		}
+	}
 }
+
