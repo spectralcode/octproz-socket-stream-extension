@@ -14,14 +14,20 @@
 
 ### 3. `octproz_tcpip_connection_two_clients_display.py`
 
-- **Description:** Extends the previous script by processing and displaying OCT images in real-time.
+- **Description:** Extends the previous script by processing and displaying OCT using mtplotlib
 - **Features:**
   - Displays images using `matplotlib`.
   - Shows FPS information on the plot.
   - Handles different image dimensions and bit depths (configurable in the script).
 
+### 3. `octproz_tcpip_connection_opencv.py`
 
-### 4. `octproz_websocket_client.html`
+- **Description:** Displays received OCT data in real-time using OpenCV. The header information streamed with the OCT data is utilized to automatically set buffer and image dimensions.
+- **Features:**
+  - Displays images using `OpenCV`.
+  - Shows data rate, FPS received and FPS displayed information on the window title.
+
+### 45. `octproz_websocket_client.html`
 
 - **Description:** WebSocket client that runs in a browser
 - **Link:** [OCTproZ WebSocket Demo](https://spectralcode.github.io/SocketStreamExtension/examples/octproz_websocket_client.html)
