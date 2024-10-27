@@ -1,4 +1,4 @@
-QT += core gui widgets network
+QT += core gui widgets network websockets
 QMAKE_PROJECT_DEPTH = 0
 
 TARGET = socketstreamextension
