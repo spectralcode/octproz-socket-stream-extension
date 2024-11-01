@@ -134,6 +134,36 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 			emit error("Invalid save_settings command format.");
 		}
 	}
+	else if(command.startsWith("set_disp_coeff")){
+		double coeffs[4];
+		double* results[4];
+		bool conversionSuccessful[4];
+		bool success = true;
+
+		QStringList parts = command.split(":", QString::SkipEmptyParts);
+		if (parts.size() == 5) {
+		parts.removeFirst();
+			for(int i = 0; i < 4; i++){
+				double val = parts[i].toDouble(&(conversionSuccessful[i]));
+				if(conversionSuccessful[i]){
+					coeffs[i] = val;
+					results[i] = &(coeffs[i]);
+				}
+				 else if(parts[i] == "nullptr") {
+					results[i] = nullptr;
+					conversionSuccessful[i] = true;
+				 }
+				 success = success && conversionSuccessful[i];
+			}
+			if (success) {
+				emit setDispCompCoeffsRequest(results[0], results[1], results[2], results[3]);
+			} else {
+				emit error("One or more coefficients could not be converted to a double.");
+			}
+		} else {
+			emit error("Invalid dispersion coefficients command");
+		}
+	}
 	emit info("Remote command received: " + command);
 }
 
