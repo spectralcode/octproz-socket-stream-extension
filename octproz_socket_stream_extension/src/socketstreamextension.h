@@ -57,6 +57,9 @@ private:
 
 	Broadcaster* broadcastServer;
 
+	void handleSettingsCommand(const QString &command, const QString &action);
+	void handleSetDispCoeffCommand(const QString &command);
+	void handleSetGrayscaleConversionCommand(const QString &command);
 
 public slots:
 	void setParams(SocketStreamExtensionParameters params);

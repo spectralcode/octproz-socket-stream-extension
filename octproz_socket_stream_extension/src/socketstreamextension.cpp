@@ -33,6 +33,7 @@
 
 #include "socketstreamextension.h"
 #include <math.h>
+#include <QtGlobal>
 
 SocketStreamExtension::SocketStreamExtension() : Extension() {
 	qRegisterMetaType<QVector<qreal> >("QVector<qreal>");
@@ -106,41 +107,56 @@ void SocketStreamExtension::storeParameters() {
 }
 
 void SocketStreamExtension::handleRemoteCommand(QString command) {
-	command = command.toLower();
-	if(command == "remote_start") {
+	command = command.trimmed();
+
+	if (command.compare("remote_start", Qt::CaseInsensitive) == 0) {
 		emit startProcessingRequest();
 	}
-	else if(command == "remote_stop") {
+	else if (command.compare("remote_stop", Qt::CaseInsensitive) == 0) {
 		emit stopProcessingRequest();
 	}
-	else if(command == "remote_record") {
+	else if (command.compare("remote_record", Qt::CaseInsensitive) == 0) {
 		emit startRecordingRequest();
 	}
 	else if (command.startsWith("load_settings", Qt::CaseInsensitive)) {
-		QStringList parts = command.split(":", QString::SkipEmptyParts);
-		if (parts.size() >= 2) {
-			QString fileName = parts.mid(1).join(":").trimmed();
-			emit loadSettingsFileRequest(fileName);
-		} else {
-			emit error("Invalid load_settings command format.");
-		}
+		this->handleSettingsCommand(command, "load");
 	}
 	else if (command.startsWith("save_settings", Qt::CaseInsensitive)) {
-		QStringList parts = command.split(":", QString::SkipEmptyParts);
-		if (parts.size() >= 2) {
-			QString fileName = parts.mid(1).join(":").trimmed();
-			emit saveSettingsFileRequest(fileName);
-		} else {
-			emit error("Invalid save_settings command format.");
-		}
+		this->handleSettingsCommand(command, "save");
 	}
-	else if(command.startsWith("set_disp_coeff")){
+	else if(command.startsWith("set_disp_coeff")) {
+		this->handleSetDispCoeffCommand(command);
+	}
+	else if (command.startsWith("set_grayscale_conversion", Qt::CaseInsensitive)) {
+		this->handleSetGrayscaleConversionCommand(command);
+	}
+	else {
+		emit error("Unknown command: " + command);
+	}
+	//emit info("Remote command received: " + command);
+}
+
+void SocketStreamExtension::handleSettingsCommand(const QString& command, const QString& action) {
+	QStringList parts = command.split(":", QString::SkipEmptyParts);
+	if (parts.size() >= 2) {
+		QString fileName = parts.mid(1).join(":").trimmed();
+		if (action == "load") {
+			emit loadSettingsFileRequest(fileName);
+		} else if (action == "save") {
+			emit saveSettingsFileRequest(fileName);
+		}
+	} else {
+		emit error(QString("Invalid %1_settings command format: %2").arg(action, command));
+	}
+}
+
+void SocketStreamExtension::handleSetDispCoeffCommand(const QString& command) {
 		double coeffs[4];
 		double* results[4];
 		bool conversionSuccessful[4];
 		bool success = true;
 
-		QStringList parts = command.split(":", QString::SkipEmptyParts);
+		QStringList parts = command.toLower().split(":", QString::SkipEmptyParts);
 		if (parts.size() == 5) {
 		parts.removeFirst();
 			for(int i = 0; i < 4; i++){
@@ -149,7 +165,7 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 					coeffs[i] = val;
 					results[i] = &(coeffs[i]);
 				}
-				 else if(parts[i] == "nullptr") {
+				 else if(parts[i] == "nullptr" || parts[i] == "null") {
 					results[i] = nullptr;
 					conversionSuccessful[i] = true;
 				 }
@@ -163,8 +179,48 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 		} else {
 			emit error("Invalid dispersion coefficients command");
 		}
+}
+
+void SocketStreamExtension::handleSetGrayscaleConversionCommand(const QString& command) {
+	QStringList parts = command.toLower().split(":", QString::SkipEmptyParts);
+	if (parts.size() == 6) {
+		bool ok[5];
+		bool enableLogScaling;
+
+		if (parts[1] == "true" || parts[1] == "1") {
+			enableLogScaling = true;
+			ok[0] = true;
+		} else if (parts[1] == "false" || parts[1] == "0") {
+			enableLogScaling = false;
+			ok[0] = true;
+		} else {
+			ok[0] = false;
+		}
+
+		auto parseDouble = [](const QString& str, bool& ok) -> double {
+			QString trimmedStr = str.trimmed();
+			if (trimmedStr == "nan" || trimmedStr == "null" || trimmedStr == "nullptr") {
+				ok = true;
+				return qQNaN();
+			}
+			return trimmedStr.toDouble(&ok);
+		};
+
+		double max = parseDouble(parts[2], ok[1]);
+		double min = parseDouble(parts[3], ok[2]);
+		double multiplicator = parseDouble(parts[4], ok[3]);
+		double offset = parseDouble(parts[5], ok[4]);
+
+		bool success = ok[0] && ok[1] && ok[2] && ok[3] && ok[4];
+
+		if (success) {
+			emit setGrayscaleConversionRequest(enableLogScaling, max, min, multiplicator, offset);
+		} else {
+			emit error("One or more coefficients could not be converted to the expected types.");
+		}
+	} else {
+		emit error("Invalid grayscale conversion command: " + command);
 	}
-	emit info("Remote command received: " + command);
 }
 
 void SocketStreamExtension::rawDataReceived(void* buffer, unsigned int bitDepth, unsigned int samplesPerLine, unsigned int linesPerFrame, unsigned int framesPerBuffer, unsigned int buffersPerVolume, unsigned int currentBufferNr) {
