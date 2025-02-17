@@ -37,6 +37,8 @@
 #define HOST_PORT "host_port"
 #define PIPE_NAME "pipe_name"
 #define SEND_HEADER "send_header"
+#define CONNECTION_MODE "mode"
+#define AUTO_CONNECT_ENABLED "auto_connect_enabled"
 
 #include <QWidget>
 #include <QCheckBox>

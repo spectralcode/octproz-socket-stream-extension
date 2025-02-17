@@ -61,12 +61,14 @@ void SocketStreamExtensionForm::setSettings(QVariantMap settings) {
 	this->ui->lineEdit_port->setText(settings.value(HOST_PORT).toString());
 	this->ui->lineEdit_pipeName->setText(settings.value(PIPE_NAME).toString());
 	this->ui->checkBox_header->setChecked(settings.value(SEND_HEADER).toBool());
-	// Setzen des Kommunikationsmodus
-	int mode = settings.value("mode").toInt();
+
+	int mode = settings.value(CONNECTION_MODE).toInt();
 	int index = ui->comboBox_mode->findData(QVariant::fromValue(mode));
 	if (index != -1) {
 		ui->comboBox_mode->setCurrentIndex(index);
 	}
+
+	this->ui->checkBox_autoConnect->setChecked(settings.value(AUTO_CONNECT_ENABLED).toBool());
 }
 
 void SocketStreamExtensionForm::getSettings(QVariantMap* settings) {
@@ -74,7 +76,8 @@ void SocketStreamExtensionForm::getSettings(QVariantMap* settings) {
 	settings->insert(HOST_PORT, this->parameters.port);
 	settings->insert(PIPE_NAME, this->parameters.pipeName);
 	settings->insert(SEND_HEADER, this->parameters.sendHeader);
-	settings->insert("mode", this->toInt(this->parameters.mode));
+	settings->insert(CONNECTION_MODE, this->toInt(this->parameters.mode));
+	settings->insert(AUTO_CONNECT_ENABLED, this->parameters.autoConnect);
 }
 
 void SocketStreamExtensionForm::updateParams() {
@@ -82,6 +85,7 @@ void SocketStreamExtensionForm::updateParams() {
 	this->parameters.port = this->ui->lineEdit_port->text().toInt();
 	this->parameters.pipeName = this->ui->lineEdit_pipeName->text();
 	this->parameters.mode = this->fromInt(ui->comboBox_mode->currentData().toInt());
+	this->parameters.autoConnect = this->ui->checkBox_autoConnect->isChecked();
 	this->parameters.sendHeader = this->ui->checkBox_header->isChecked();
 
 	emit paramsChanged(this->parameters);

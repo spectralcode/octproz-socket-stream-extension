@@ -20,6 +20,7 @@ struct SocketStreamExtensionParameters {
 	QString ip;
 	quint16 port;
 	bool sendHeader;
+	bool autoConnect;
 };
 Q_DECLARE_METATYPE(SocketStreamExtensionParameters)
 

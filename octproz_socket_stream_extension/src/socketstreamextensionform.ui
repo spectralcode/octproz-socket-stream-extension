@@ -21,16 +21,16 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_2">
    <property name="leftMargin">
-    <number>6</number>
+    <number>3</number>
    </property>
    <property name="topMargin">
-    <number>6</number>
+    <number>9</number>
    </property>
    <property name="rightMargin">
-    <number>6</number>
+    <number>3</number>
    </property>
    <property name="bottomMargin">
-    <number>6</number>
+    <number>9</number>
    </property>
    <item>
     <widget class="QGroupBox" name="groupBox">
@@ -38,6 +38,24 @@
       <string>Connection Settings</string>
      </property>
      <layout class="QFormLayout" name="formLayout">
+      <property name="horizontalSpacing">
+       <number>3</number>
+      </property>
+      <property name="verticalSpacing">
+       <number>3</number>
+      </property>
+      <property name="leftMargin">
+       <number>3</number>
+      </property>
+      <property name="topMargin">
+       <number>3</number>
+      </property>
+      <property name="rightMargin">
+       <number>3</number>
+      </property>
+      <property name="bottomMargin">
+       <number>3</number>
+      </property>
       <item row="0" column="0">
        <widget class="QLabel" name="label_4">
         <property name="text">
@@ -78,6 +96,29 @@
       <item row="3" column="1">
        <widget class="QLineEdit" name="lineEdit_port"/>
       </item>
+      <item row="5" column="0" colspan="2">
+       <widget class="QCheckBox" name="checkBox_autoConnect">
+        <property name="text">
+         <string>Auto connect on startup</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0">
+       <spacer name="verticalSpacer_2">
+        <property name="orientation">
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::Fixed</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>20</width>
+          <height>3</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
      </layout>
     </widget>
    </item>
@@ -91,16 +132,16 @@
        <number>3</number>
       </property>
       <property name="leftMargin">
-       <number>6</number>
+       <number>3</number>
       </property>
       <property name="topMargin">
-       <number>6</number>
+       <number>3</number>
       </property>
       <property name="rightMargin">
-       <number>6</number>
+       <number>3</number>
       </property>
       <property name="bottomMargin">
-       <number>6</number>
+       <number>3</number>
       </property>
       <item>
        <widget class="QCheckBox" name="checkBox_header">

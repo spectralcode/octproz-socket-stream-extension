@@ -60,6 +60,7 @@ private:
 	void handleSettingsCommand(const QString &command, const QString &action);
 	void handleSetDispCoeffCommand(const QString &command);
 	void handleSetGrayscaleConversionCommand(const QString &command);
+	void autoConnect();
 
 public slots:
 	void setParams(SocketStreamExtensionParameters params);

@@ -82,6 +82,8 @@ QWidget* SocketStreamExtension::getWidget() {
 void SocketStreamExtension::activateExtension() {
 	//this method is called by OCTproZ as soon as user activates the extension. If the extension controls hardware components, they can be prepared, activated, initialized or started here.
 	this->active = true;
+
+	this->autoConnect();
 }
 
 void SocketStreamExtension::deactivateExtension() {
@@ -220,6 +222,22 @@ void SocketStreamExtension::handleSetGrayscaleConversionCommand(const QString& c
 		}
 	} else {
 		emit error("Invalid grayscale conversion command: " + command);
+	}
+}
+
+void SocketStreamExtension::autoConnect() {
+	//get current settings from the form
+	QVariantMap currentSettings;
+	this->form->getSettings(&currentSettings);
+	bool autoConnect = currentSettings.value(AUTO_CONNECT_ENABLED, false).toBool();
+	QString ip = currentSettings.value(HOST_IP).toString();
+
+	//if auto connect is enabled and an IP address is provided, start broadcasting automatically
+	if (autoConnect && !ip.isEmpty()) {
+		emit info("Auto connecting to socket stream on startup...");
+		QMetaObject::invokeMethod(this->broadcastServer,
+			"startBroadcasting",
+			Qt::QueuedConnection);
 	}
 }
 
