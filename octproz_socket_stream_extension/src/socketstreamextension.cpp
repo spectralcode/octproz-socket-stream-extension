@@ -126,6 +126,9 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 	else if (command.startsWith("save_settings", Qt::CaseInsensitive)) {
 		this->handleSettingsCommand(command, "save");
 	}
+	else if(command.startsWith("remote_plugin_control", Qt::CaseInsensitive)){
+		this->handleRemotePluginControlCommand(command);
+	}
 	else if(command.startsWith("set_disp_coeff")) {
 		this->handleSetDispCoeffCommand(command);
 	}
@@ -150,6 +153,19 @@ void SocketStreamExtension::handleSettingsCommand(const QString& command, const 
 	} else {
 		emit error(QString("Invalid %1_settings command format: %2").arg(action, command));
 	}
+}
+
+void SocketStreamExtension::handleRemotePluginControlCommand(const QString &command) {
+	//Expected format: remote_plugin_control, PluginName, Command
+	QStringList parts = command.split(",", QString::SkipEmptyParts);
+	if(parts.size() < 3){
+		emit error("Invalid remote_plugin_control command format: " + command);
+		return;
+	}
+	QString targetPlugin = parts.at(1).trimmed();
+	QString pluginCommand = parts.mid(2).join(",").trimmed();
+	emit sendCommand(this->getName(), targetPlugin, pluginCommand);
+	emit info("Sent plugin command '" + pluginCommand + "' to plugin '" + targetPlugin + "'");
 }
 
 void SocketStreamExtension::handleSetDispCoeffCommand(const QString& command) {

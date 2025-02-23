@@ -58,6 +58,7 @@ private:
 	Broadcaster* broadcastServer;
 
 	void handleSettingsCommand(const QString &command, const QString &action);
+	void handleRemotePluginControlCommand(const QString &command);
 	void handleSetDispCoeffCommand(const QString &command);
 	void handleSetGrayscaleConversionCommand(const QString &command);
 	void autoConnect();
