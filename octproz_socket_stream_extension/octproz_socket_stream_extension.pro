@@ -38,7 +38,8 @@ SOURCES += \
 HEADERS += \
 	src/broadcaster.h \
 	src/socketstreamextension.h \
-	src/socketstreamextensionform.h 
+	src/socketstreamextensionform.h  \
+	src/socketstreamextensionparameters.h							  
 
 FORMS += \
 	src/socketstreamextensionform.ui
