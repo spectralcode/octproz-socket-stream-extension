@@ -103,6 +103,11 @@
 		<button id="startBtn">Start</button><br>
 		<button id="stopBtn">Stop</button><br>
 		<button id="rotateBtn" disabled>Rotate 90°</button><br>
+		<label for="pluginName">Plugin Name:</label><br>
+		<input type="text" id="pluginName" placeholder="e.g., Dispersion Estimator"><br>
+		<label for="pluginCommand">Plugin Command:</label><br>
+		<input type="text" id="pluginCommand" placeholder="e.g., startSingleFetch"><br>
+		<button id="sendPluginCmdBtn">Send Plugin Cmd</button><br>
 	</div>
 
 	<div id="info">
@@ -130,6 +135,9 @@
 		const disconnectBtn = document.getElementById('disconnectBtn');
 		const startBtn = document.getElementById('startBtn');
 		const stopBtn = document.getElementById('stopBtn');
+		const pluginNameInput = document.getElementById('pluginName');
+		const pluginCommandInput = document.getElementById('pluginCommand');
+		const sendPluginCmdBtn = document.getElementById('sendPluginCmdBtn');
 
 		let frameCount = 0;
 		let currentFps = 0;
@@ -306,6 +314,24 @@
 		rotateBtn.addEventListener('click', () => {
 			rotation = (rotation + 90) % 360;
 			draw(); // Redraw with new rotation
+		});
+
+		// Event listener for sending plugin commands
+		sendPluginCmdBtn.addEventListener('click', () => {
+			if (socket && socket.readyState === WebSocket.OPEN) {
+				const targetPlugin = pluginNameInput.value.trim();
+				const pluginCmd = pluginCommandInput.value.trim();
+				if (!targetPlugin || !pluginCmd) {
+					alert('Please enter both Plugin Name and Plugin Command.');
+					return;
+				}
+				// Construct command: remote_plugin_control, PluginName, Command
+				const remoteCmd = `remote_plugin_control, ${targetPlugin}, ${pluginCmd}`;
+				socket.send(remoteCmd);
+				console.log("Sent remote plugin control command:", remoteCmd);
+			} else {
+				alert('Socket is not connected.');
+			}
 		});
 
 		// Mouse Events for Dragging
