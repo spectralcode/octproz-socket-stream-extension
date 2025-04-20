@@ -294,6 +294,7 @@ void Broadcaster::processIncomingMessage(const QString& dataString, QObject* dev
 }
 
 void Broadcaster::broadcast(void* buffer, quint32 bufferSizeInBytes, quint16 framesPerBuffer, quint16 frameWidth, quint16 frameHeight, quint8 bitDepth) {
+	Q_UNUSED(framesPerBuffer);
 	QByteArray frameData;
 	QDataStream stream(&frameData, QIODevice::WriteOnly);
 	stream.setByteOrder(QDataStream::BigEndian);
