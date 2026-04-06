@@ -61,6 +61,9 @@ private:
 	void handleRemotePluginControlCommand(const QString &command);
 	void handleSetDispCoeffCommand(const QString &command);
 	void handleSetGrayscaleConversionCommand(const QString &command);
+	void handleSetKLinCoeffsCommand(const QString &command);
+	void handleSetKLinCurveCommand(const QString &command);
+	void handleLoadKLinCurveCommand(const QString &command);
 	void autoConnect();
 
 public slots:

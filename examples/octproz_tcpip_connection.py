@@ -16,6 +16,11 @@ def main():
         'remote_record',
         'load_settings:<file_path>',
         'save_settings:<file_path>',
+        'set_disp_coeff:<d0>:<d1>:<d2>:<d3>',
+        'set_grayscale_conversion:<enable_log>:<max>:<min>:<mult>:<offset>',
+        'set_klin_coeffs:<c0>:<c1>:<c2>:<c3>',
+        'set_klin_curve:<v0>,<v1>,<v2>,...',
+        'load_klin_curve:<file_path>',
         'ping',
         'enable_command_only_mode',
         'disable_command_only_mode'

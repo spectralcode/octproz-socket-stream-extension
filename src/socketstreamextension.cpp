@@ -34,6 +34,8 @@
 #include "socketstreamextension.h"
 #include <math.h>
 #include <QtGlobal>
+#include <QFile>
+#include <QTextStream>
 
 SocketStreamExtension::SocketStreamExtension() : Extension() {
 	qRegisterMetaType<QVector<qreal> >("QVector<qreal>");
@@ -134,6 +136,15 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 	}
 	else if (command.startsWith("set_grayscale_conversion", Qt::CaseInsensitive)) {
 		this->handleSetGrayscaleConversionCommand(command);
+	}
+	else if(command.startsWith("set_klin_coeffs", Qt::CaseInsensitive)) {
+		this->handleSetKLinCoeffsCommand(command);
+	}
+	else if(command.startsWith("set_klin_curve", Qt::CaseInsensitive)) {
+		this->handleSetKLinCurveCommand(command);
+	}
+	else if(command.startsWith("load_klin_curve", Qt::CaseInsensitive)) {
+		this->handleLoadKLinCurveCommand(command);
 	}
 	else {
 		emit error("Unknown command: " + command);
@@ -239,6 +250,103 @@ void SocketStreamExtension::handleSetGrayscaleConversionCommand(const QString& c
 	} else {
 		emit error("Invalid grayscale conversion command: " + command);
 	}
+}
+
+void SocketStreamExtension::handleSetKLinCoeffsCommand(const QString& command) {
+	double coeffs[4];
+	double* results[4];
+	bool conversionSuccessful[4];
+	bool success = true;
+
+	QStringList parts = command.toLower().split(":", QString::SkipEmptyParts);
+	if (parts.size() == 5) {
+		parts.removeFirst();
+		for(int i = 0; i < 4; i++){
+			double val = parts[i].toDouble(&(conversionSuccessful[i]));
+			if(conversionSuccessful[i]){
+				coeffs[i] = val;
+				results[i] = &(coeffs[i]);
+			}
+			else if(parts[i] == "nullptr" || parts[i] == "null") {
+				results[i] = nullptr;
+				conversionSuccessful[i] = true;
+			}
+			success = success && conversionSuccessful[i];
+		}
+		if (success) {
+			emit setKLinCoeffsRequest(results[0], results[1], results[2], results[3]);
+		} else {
+			emit error("One or more k-linearization coefficients could not be converted to a double.");
+		}
+	} else {
+		emit error("Invalid k-linearization coefficients command. Expected format: set_klin_coeffs:<c0>:<c1>:<c2>:<c3>");
+	}
+}
+
+void SocketStreamExtension::handleSetKLinCurveCommand(const QString& command) {
+	int colonIndex = command.indexOf(':');
+	if (colonIndex < 0 || colonIndex == command.size() - 1) {
+		emit error("Invalid set_klin_curve command. Expected format: set_klin_curve:<v0>,<v1>,<v2>,...");
+		return;
+	}
+
+	QString data = command.mid(colonIndex + 1).trimmed();
+	QStringList parts = data.split(",", QString::SkipEmptyParts);
+	QVector<float> curve;
+	curve.reserve(parts.size());
+
+	for (const QString& part : parts) {
+		bool ok;
+		float val = part.trimmed().toFloat(&ok);
+		if (!ok) {
+			emit error("Invalid float value in k-linearization curve: " + part.trimmed());
+			return;
+		}
+		curve.append(val);
+	}
+
+	if (curve.isEmpty()) {
+		emit error("Empty k-linearization curve data.");
+		return;
+	}
+
+	emit setCustomResamplingCurveRequest(curve);
+}
+
+void SocketStreamExtension::handleLoadKLinCurveCommand(const QString& command) {
+	int colonIndex = command.indexOf(':');
+	if (colonIndex < 0 || colonIndex == command.size() - 1) {
+		emit error("Invalid load_klin_curve command. Expected format: load_klin_curve:<file_path>");
+		return;
+	}
+
+	QString fileName = command.mid(colonIndex + 1).trimmed();
+	QFile file(fileName);
+	if (!file.open(QIODevice::ReadOnly)) {
+		emit error("Could not open k-linearization curve file: " + fileName);
+		return;
+	}
+
+	QVector<float> curve;
+	QTextStream txtStream(&file);
+	txtStream.readLine(); // skip header
+	while (!txtStream.atEnd()) {
+		QString line = txtStream.readLine();
+		bool ok;
+		float val = line.section(";", 1, 1).toFloat(&ok);
+		if (ok) {
+			curve.append(val);
+		}
+	}
+	file.close();
+
+	if (curve.isEmpty()) {
+		emit error("K-linearization curve file is empty or has wrong format: " + fileName);
+		return;
+	}
+
+	emit setCustomResamplingCurveRequest(curve);
+	emit info("Custom k-linearization curve loaded from file: " + fileName);
 }
 
 void SocketStreamExtension::autoConnect() {
