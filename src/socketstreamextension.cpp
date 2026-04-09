@@ -122,6 +122,18 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 	else if (command.compare("remote_record", Qt::CaseInsensitive) == 0) {
 		emit startRecordingRequest();
 	}
+	else if (command.startsWith("remote_record:", Qt::CaseInsensitive)) {
+		this->handleRemoteRecordWithParams(command);
+	}
+	else if (command.startsWith("set_rec_path:", Qt::CaseInsensitive)) {
+		this->handleSetRecPathCommand(command);
+	}
+	else if (command.startsWith("set_rec_name:", Qt::CaseInsensitive)) {
+		this->handleSetRecNameCommand(command);
+	}
+	else if (command.startsWith("set_buffers_to_record:", Qt::CaseInsensitive)) {
+		this->handleSetBuffersToRecordCommand(command);
+	}
 	else if (command.startsWith("load_settings", Qt::CaseInsensitive)) {
 		this->handleSettingsCommand(command, "load");
 	}
@@ -145,6 +157,12 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 	}
 	else if(command.startsWith("load_klin_curve", Qt::CaseInsensitive)) {
 		this->handleLoadKLinCurveCommand(command);
+	}
+	else if (command.startsWith("set_rec_options:", Qt::CaseInsensitive)) {
+		this->handleSetRecOptionsCommand(command);
+	}
+	else if (command.startsWith("set_preallocation:", Qt::CaseInsensitive)) {
+		this->handleSetPreallocationCommand(command);
 	}
 	else {
 		emit error("Unknown command: " + command);
@@ -347,6 +365,96 @@ void SocketStreamExtension::handleLoadKLinCurveCommand(const QString& command) {
 
 	emit setCustomResamplingCurveRequest(curve);
 	emit info("Custom k-linearization curve loaded from file: " + fileName);
+}
+
+void SocketStreamExtension::handleSetRecPathCommand(const QString &command) {
+	QStringList parts = command.split(":", QString::SkipEmptyParts);
+	if (parts.size() < 2) {
+		emit error("Invalid set_rec_path command format: " + command);
+		return;
+	}
+	QString path = parts.mid(1).join(":").trimmed();
+	emit appCommandRequest("set_rec_path", {{"path", path}});
+}
+
+void SocketStreamExtension::handleSetRecNameCommand(const QString &command) {
+	int colonIdx = command.indexOf(':');
+	if (colonIdx < 0 || colonIdx == command.length() - 1) {
+		emit error("Invalid set_rec_name command format: " + command);
+		return;
+	}
+	QString name = command.mid(colonIdx + 1).trimmed();
+	emit appCommandRequest("set_rec_name", {{"name", name}});
+}
+
+void SocketStreamExtension::handleSetBuffersToRecordCommand(const QString &command) {
+	int colonIdx = command.indexOf(':');
+	if (colonIdx < 0 || colonIdx == command.length() - 1) {
+		emit error("Invalid set_buffers_to_record command format: " + command);
+		return;
+	}
+	bool ok;
+	unsigned int count = command.mid(colonIdx + 1).trimmed().toUInt(&ok);
+	if (!ok || count == 0) {
+		emit error("Invalid buffer count (must be a positive integer): " + command);
+		return;
+	}
+	emit appCommandRequest("set_buffers_to_record", {{"count", count}});
+}
+
+void SocketStreamExtension::handleRemoteRecordWithParams(const QString &command) {
+	int colonIdx = command.indexOf(':');
+	QString args = command.mid(colonIdx + 1).trimmed();
+	if (args.isEmpty()) {
+		emit error("Invalid remote_record command format: " + command);
+		return;
+	}
+
+	QVariantMap params;
+	int pipeIdx = args.indexOf('|');
+	if (pipeIdx >= 0) {
+		QString path = args.left(pipeIdx).trimmed();
+		QString name = args.mid(pipeIdx + 1).trimmed();
+		if (!path.isEmpty()) params["path"] = path;
+		if (!name.isEmpty()) params["name"] = name;
+	} else {
+		params["path"] = args;
+	}
+	emit appCommandRequest("record", params);
+}
+
+void SocketStreamExtension::handleSetRecOptionsCommand(const QString &command) {
+	// Format: set_rec_options:raw=1:processed=0:meta=1:...
+	QStringList parts = command.split(":", QString::SkipEmptyParts);
+	if (parts.size() < 2) {
+		emit error("Invalid set_rec_options command format: " + command);
+		return;
+	}
+
+	QVariantMap params;
+	for (int i = 1; i < parts.size(); i++) {
+		QStringList kv = parts[i].split("=");
+		if (kv.size() != 2) {
+			emit error("Invalid key=value pair in set_rec_options: " + parts[i]);
+			return;
+		}
+		QString key = kv[0].trimmed().toLower();
+		QString val = kv[1].trimmed().toLower();
+		bool boolVal = (val == "1" || val == "true");
+		params[key] = boolVal;
+	}
+	emit appCommandRequest("set_rec_options", params);
+}
+
+void SocketStreamExtension::handleSetPreallocationCommand(const QString &command) {
+	int colonIdx = command.indexOf(':');
+	if (colonIdx < 0 || colonIdx == command.length() - 1) {
+		emit error("Invalid set_preallocation command format: " + command);
+		return;
+	}
+	QString val = command.mid(colonIdx + 1).trimmed().toLower();
+	bool enable = (val == "1" || val == "true");
+	emit appCommandRequest("set_preallocation", {{"enable", enable}});
 }
 
 void SocketStreamExtension::autoConnect() {

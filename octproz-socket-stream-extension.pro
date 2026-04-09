@@ -44,7 +44,7 @@ FORMS += \
 
 INCLUDEPATH += \
 	$$SHAREDIR \
-	src 
+	src
 
 
 

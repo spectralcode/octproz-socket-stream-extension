@@ -64,6 +64,12 @@ private:
 	void handleSetKLinCoeffsCommand(const QString &command);
 	void handleSetKLinCurveCommand(const QString &command);
 	void handleLoadKLinCurveCommand(const QString &command);
+	void handleSetRecPathCommand(const QString &command);
+	void handleSetRecNameCommand(const QString &command);
+	void handleSetBuffersToRecordCommand(const QString &command);
+	void handleRemoteRecordWithParams(const QString &command);
+	void handleSetRecOptionsCommand(const QString &command);
+	void handleSetPreallocationCommand(const QString &command);
 	void autoConnect();
 
 public slots:
