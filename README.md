@@ -60,7 +60,7 @@ Only specified keys are changed; omitted keys keep their current values. All val
 | `start_first` | Start recording with the first buffer |
 | `float32` | Save as 32-bit float |
 
-Example: `set_rec_options:raw=1:processed=1:meta=0:stop_after=1`
+Example: `set_rec_options:raw=1:processed=1:meta=0:stop_after=1` - Enable raw and processed recording, disable metadata saving, and stop acquisition after the recording finishes.
 
 ### Buffer Preallocation (`set_preallocation`)
 
@@ -86,6 +86,14 @@ Examples:
 | `set_klin_coeffs:<c0>:<c1>:<c2>:<c3>` | Set k-linearization polynomial coefficients (double or `null`) |
 | `set_klin_curve:<v0>,<v1>,...,<vN>` | Set custom resampling curve (comma-separated floats) |
 | `load_klin_curve:<file_path>` | Load resampling curve from CSV file |
+| `set_bg_frame:enable=<0\|1>:bscans=<N>` | Configure static background-frame subtraction for line-field OCT |
+| `set_continuous_bg:enable=<0\|1>:ema=<0\|1>` | Configure continuous background update mode |
+| `record_bg_frame` | Record a new static background frame |
+| `load_bg_frame:<file_path>` | Load a background frame from a `.raw` file |
+| `save_bg_frame:<file_path>` | Save the current background frame to a `.raw` file |
+| `clear_bg_frame` | Clear the stored background frame and disable background subtraction |
+| `set_full_range:enable=<0\|1>` | Enable or disable full-range line-field processing |
+| `set_cc:enable=<0\|1>:center=<0-1>:width=<0-1>:keep_positive=<0\|1>` | Configure complex conjugate artifact removal |
 
 ### Dispersion Coefficients (`set_disp_coeff`)
 Each coefficient can be a double or `nullptr`/`null` to leave the respective coefficient unchanged.
@@ -104,4 +112,36 @@ The CSV file should use semicolons as delimiters with resampling values in the s
 Examples:
 - Windows: `load_klin_curve:C:/Users/username/curves/klin_curve.csv`
 - Linux: `load_klin_curve:/home/username/curves/klin_curve.csv`
+
+### Line-Field OCT Commands
+
+These commands update runtime parameters only. They do not update the Advanced Settings dialog and they are not persisted to the settings file.
+
+Only specified keys are changed; omitted keys keep their current values.
+
+| Command | Description |
+|---------|-------------|
+| `set_bg_frame:enable=<0\|1>:bscans=<N>` | Configure static background-frame subtraction and the averaging count used when recording a new frame. |
+| `set_continuous_bg:enable=<0\|1>:ema=<0\|1>` | Configure continuous background estimation and select the averaging method. |
+| `record_bg_frame` | Record a new static background frame from the current acquisition. |
+| `load_bg_frame:<file_path>` | Load a previously saved background frame from disk. |
+| `save_bg_frame:<file_path>` | Save the current background frame to disk. |
+| `clear_bg_frame` | Clear the stored background frame and disable background subtraction modes. |
+| `set_full_range:enable=<0\|1>` | Enable or disable full-range line-field processing output. |
+| `set_cc:enable=<0\|1>:center=<0-1>:width=<0-1>:keep_positive=<0\|1>` | Configure complex conjugate artifact removal. |
+
+Examples:
+- `set_bg_frame:enable=1:bscans=10` - Enable static background-frame subtraction and average 10 B-scans when recording a new frame.
+- `set_continuous_bg:enable=1:ema=1` - Enable continuous background estimation and use the exponential moving average method.
+- `set_continuous_bg:enable=0` - Disable continuous background estimation and keep the current `ema` setting unchanged.
+- `record_bg_frame` - Record a new static background frame from the current acquisition.
+- `set_cc:enable=1:center=0.25:width=0.5:keep_positive=1` - Enable complex conjugate artifact removal with the given passband settings.
+
+
+
+Notes:
+- `record_bg_frame`, `load_bg_frame`, and `save_bg_frame` are rejected while continuous background mode is enabled.
+- `set_full_range` is accepted during active processing, but it only takes effect after the next stop/start reinitialization.
+- `load_bg_frame` keeps the loaded frame even if its dimensions do not match the current acquisition. In that case the frame remains inactive until dimensions match.
+- `clear_bg_frame` clears the stored frame/path and disables both static background subtraction and continuous background mode.
 

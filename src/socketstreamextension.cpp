@@ -164,10 +164,84 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 	else if (command.startsWith("set_preallocation:", Qt::CaseInsensitive)) {
 		this->handleSetPreallocationCommand(command);
 	}
+	else if (command.startsWith("set_bg_frame", Qt::CaseInsensitive)) {
+		this->handleSetBgFrameCommand(command);
+	}
+	else if (command.startsWith("set_continuous_bg", Qt::CaseInsensitive)) {
+		this->handleSetContinuousBgCommand(command);
+	}
+	else if (command.compare("record_bg_frame", Qt::CaseInsensitive) == 0) {
+		this->handleRecordBgFrameCommand();
+	}
+	else if (command.startsWith("load_bg_frame", Qt::CaseInsensitive)) {
+		this->handleLoadBgFrameCommand(command);
+	}
+	else if (command.startsWith("save_bg_frame", Qt::CaseInsensitive)) {
+		this->handleSaveBgFrameCommand(command);
+	}
+	else if (command.compare("clear_bg_frame", Qt::CaseInsensitive) == 0) {
+		this->handleClearBgFrameCommand();
+	}
+	else if (command.startsWith("set_full_range", Qt::CaseInsensitive)) {
+		this->handleSetFullRangeCommand(command);
+	}
+	else if (command.startsWith("set_cc", Qt::CaseInsensitive)) {
+		this->handleSetCcCommand(command);
+	}
 	else {
 		emit error("Unknown command: " + command);
 	}
 	//emit info("Remote command received: " + command);
+}
+
+bool SocketStreamExtension::parseBoolValue(const QString &value, bool &parsedValue) const {
+	QString normalized = value.trimmed().toLower();
+	if (normalized == "1" || normalized == "true") {
+		parsedValue = true;
+		return true;
+	}
+	if (normalized == "0" || normalized == "false") {
+		parsedValue = false;
+		return true;
+	}
+	return false;
+}
+
+bool SocketStreamExtension::parseKeyValueCommand(const QString &command, QVariantMap &rawParams, QString &errorMessage) const {
+	int colonIndex = command.indexOf(':');
+	if (colonIndex < 0 || colonIndex == command.size() - 1) {
+		errorMessage = "missing parameters";
+		return false;
+	}
+
+	QStringList parts = command.mid(colonIndex + 1).split(":", QString::SkipEmptyParts);
+	if (parts.isEmpty()) {
+		errorMessage = "missing parameters";
+		return false;
+	}
+
+	for (const QString& part : parts) {
+		int equalsIndex = part.indexOf('=');
+		if (equalsIndex <= 0 || equalsIndex == part.size() - 1) {
+			errorMessage = "invalid key=value pair: " + part.trimmed();
+			return false;
+		}
+
+		QString key = part.left(equalsIndex).trimmed().toLower();
+		QString value = part.mid(equalsIndex + 1).trimmed();
+		if (key.isEmpty() || value.isEmpty()) {
+			errorMessage = "invalid key=value pair: " + part.trimmed();
+			return false;
+		}
+		if (rawParams.contains(key)) {
+			errorMessage = "duplicate key: " + key;
+			return false;
+		}
+
+		rawParams.insert(key, value);
+	}
+
+	return true;
 }
 
 void SocketStreamExtension::handleSettingsCommand(const QString& command, const QString& action) {
@@ -455,6 +529,172 @@ void SocketStreamExtension::handleSetPreallocationCommand(const QString &command
 	QString val = command.mid(colonIdx + 1).trimmed().toLower();
 	bool enable = (val == "1" || val == "true");
 	emit appCommandRequest("set_preallocation", {{"enable", enable}});
+}
+
+void SocketStreamExtension::handleSetBgFrameCommand(const QString &command) {
+	QVariantMap rawParams;
+	QString errorMessage;
+	if (!this->parseKeyValueCommand(command, rawParams, errorMessage)) {
+		emit error("Invalid set_bg_frame command format: " + errorMessage);
+		return;
+	}
+
+	QVariantMap params;
+	for (auto it = rawParams.cbegin(); it != rawParams.cend(); ++it) {
+		if (it.key() == "enable") {
+			bool enable;
+			if (!this->parseBoolValue(it.value().toString(), enable)) {
+				emit error("Invalid boolean value for set_bg_frame enable: " + it.value().toString());
+				return;
+			}
+			params.insert("enable", enable);
+		}
+		else if (it.key() == "bscans") {
+			bool ok;
+			unsigned int bscans = it.value().toString().toUInt(&ok);
+			if (!ok) {
+				emit error("Invalid integer value for set_bg_frame bscans: " + it.value().toString());
+				return;
+			}
+			params.insert("bscans", bscans);
+		}
+		else {
+			emit error("Unknown set_bg_frame parameter: " + it.key());
+			return;
+		}
+	}
+
+	emit appCommandRequest("set_bg_frame", params);
+}
+
+void SocketStreamExtension::handleSetContinuousBgCommand(const QString &command) {
+	QVariantMap rawParams;
+	QString errorMessage;
+	if (!this->parseKeyValueCommand(command, rawParams, errorMessage)) {
+		emit error("Invalid set_continuous_bg command format: " + errorMessage);
+		return;
+	}
+
+	QVariantMap params;
+	for (auto it = rawParams.cbegin(); it != rawParams.cend(); ++it) {
+		bool parsedValue;
+		if (!this->parseBoolValue(it.value().toString(), parsedValue)) {
+			emit error(QString("Invalid boolean value for set_continuous_bg %1: %2").arg(it.key(), it.value().toString()));
+			return;
+		}
+
+		if (it.key() == "enable" || it.key() == "ema") {
+			params.insert(it.key(), parsedValue);
+		}
+		else {
+			emit error("Unknown set_continuous_bg parameter: " + it.key());
+			return;
+		}
+	}
+
+	emit appCommandRequest("set_continuous_bg", params);
+}
+
+void SocketStreamExtension::handleRecordBgFrameCommand() {
+	emit appCommandRequest("record_bg_frame");
+}
+
+void SocketStreamExtension::handleLoadBgFrameCommand(const QString &command) {
+	int colonIndex = command.indexOf(':');
+	if (colonIndex < 0 || colonIndex == command.size() - 1) {
+		emit error("Invalid load_bg_frame command format: " + command);
+		return;
+	}
+
+	QString path = command.mid(colonIndex + 1).trimmed();
+	if (path.isEmpty()) {
+		emit error("Invalid load_bg_frame command format: " + command);
+		return;
+	}
+
+	emit appCommandRequest("load_bg_frame", {{"path", path}});
+}
+
+void SocketStreamExtension::handleSaveBgFrameCommand(const QString &command) {
+	int colonIndex = command.indexOf(':');
+	if (colonIndex < 0 || colonIndex == command.size() - 1) {
+		emit error("Invalid save_bg_frame command format: " + command);
+		return;
+	}
+
+	QString path = command.mid(colonIndex + 1).trimmed();
+	if (path.isEmpty()) {
+		emit error("Invalid save_bg_frame command format: " + command);
+		return;
+	}
+
+	emit appCommandRequest("save_bg_frame", {{"path", path}});
+}
+
+void SocketStreamExtension::handleClearBgFrameCommand() {
+	emit appCommandRequest("clear_bg_frame");
+}
+
+void SocketStreamExtension::handleSetFullRangeCommand(const QString &command) {
+	QVariantMap rawParams;
+	QString errorMessage;
+	if (!this->parseKeyValueCommand(command, rawParams, errorMessage)) {
+		emit error("Invalid set_full_range command format: " + errorMessage);
+		return;
+	}
+
+	QVariantMap params;
+	for (auto it = rawParams.cbegin(); it != rawParams.cend(); ++it) {
+		if (it.key() != "enable") {
+			emit error("Unknown set_full_range parameter: " + it.key());
+			return;
+		}
+
+		bool enable;
+		if (!this->parseBoolValue(it.value().toString(), enable)) {
+			emit error("Invalid boolean value for set_full_range enable: " + it.value().toString());
+			return;
+		}
+		params.insert("enable", enable);
+	}
+
+	emit appCommandRequest("set_full_range", params);
+}
+
+void SocketStreamExtension::handleSetCcCommand(const QString &command) {
+	QVariantMap rawParams;
+	QString errorMessage;
+	if (!this->parseKeyValueCommand(command, rawParams, errorMessage)) {
+		emit error("Invalid set_cc command format: " + errorMessage);
+		return;
+	}
+
+	QVariantMap params;
+	for (auto it = rawParams.cbegin(); it != rawParams.cend(); ++it) {
+		if (it.key() == "enable" || it.key() == "keep_positive") {
+			bool parsedValue;
+			if (!this->parseBoolValue(it.value().toString(), parsedValue)) {
+				emit error(QString("Invalid boolean value for set_cc %1: %2").arg(it.key(), it.value().toString()));
+				return;
+			}
+			params.insert(it.key(), parsedValue);
+		}
+		else if (it.key() == "center" || it.key() == "width") {
+			bool ok;
+			double parsedValue = it.value().toString().toDouble(&ok);
+			if (!ok) {
+				emit error(QString("Invalid numeric value for set_cc %1: %2").arg(it.key(), it.value().toString()));
+				return;
+			}
+			params.insert(it.key(), parsedValue);
+		}
+		else {
+			emit error("Unknown set_cc parameter: " + it.key());
+			return;
+		}
+	}
+
+	emit appCommandRequest("set_cc", params);
 }
 
 void SocketStreamExtension::autoConnect() {

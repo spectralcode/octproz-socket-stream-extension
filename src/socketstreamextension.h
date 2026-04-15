@@ -70,6 +70,16 @@ private:
 	void handleRemoteRecordWithParams(const QString &command);
 	void handleSetRecOptionsCommand(const QString &command);
 	void handleSetPreallocationCommand(const QString &command);
+	void handleSetBgFrameCommand(const QString &command);
+	void handleSetContinuousBgCommand(const QString &command);
+	void handleRecordBgFrameCommand();
+	void handleLoadBgFrameCommand(const QString &command);
+	void handleSaveBgFrameCommand(const QString &command);
+	void handleClearBgFrameCommand();
+	void handleSetFullRangeCommand(const QString &command);
+	void handleSetCcCommand(const QString &command);
+	bool parseBoolValue(const QString &value, bool &parsedValue) const;
+	bool parseKeyValueCommand(const QString &command, QVariantMap &rawParams, QString &errorMessage) const;
 	void autoConnect();
 
 public slots:
