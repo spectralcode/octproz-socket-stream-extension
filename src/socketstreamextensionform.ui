@@ -150,6 +150,26 @@
         </property>
        </widget>
       </item>
+      <item>
+       <widget class="QCheckBox" name="checkBox_timestamp">
+        <property name="toolTip">
+         <string>Append the broadcaster's wall-clock send timestamp (8 bytes, big-endian uint64 ms since epoch) to the frame header. Lets a receiver compute the send-to-receive latency. Requires 'Include header' to also be enabled. Clients that expect the 13-byte header must leave this off.</string>
+        </property>
+        <property name="text">
+         <string>Append send timestamp (for latency measurement)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="checkBox_tcpNoDelay">
+        <property name="toolTip">
+         <string>Disable Nagle's algorithm (sets TCP_NODELAY) on new TCP connections. Can slightly reduce tail latency on loopback and LAN. No effect in IPC or WebSocket mode.</string>
+        </property>
+        <property name="text">
+         <string>TCP_NODELAY (disable Nagle)</string>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>

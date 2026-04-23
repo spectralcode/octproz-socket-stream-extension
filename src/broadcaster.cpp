@@ -34,6 +34,7 @@
 #include "socketstreamextensionparameters.h"
 #include <QHostAddress>
 #include <QDataStream>
+#include <QDateTime>
 #include <QDebug>
 
 quint32 Broadcaster::startIdentifier = 299792458; // identifier (magic number) for synchronization on client side
@@ -177,8 +178,12 @@ void Broadcaster::onClientConnected() {
 		connect(newConnection, &QIODevice::readyRead, this, &Broadcaster::readyRead);
 
 		if(this->params.mode == CommunicationMode::TCPIP) {
-			connect(static_cast<QTcpSocket*>(newConnection), &QTcpSocket::disconnected, this, &Broadcaster::onClientDisconnected);
-			tcpConnections.append(static_cast<QTcpSocket*>(newConnection));
+			QTcpSocket* tcpSocket = static_cast<QTcpSocket*>(newConnection);
+			connect(tcpSocket, &QTcpSocket::disconnected, this, &Broadcaster::onClientDisconnected);
+			if(this->params.tcpNoDelay) {
+				tcpSocket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
+			}
+			tcpConnections.append(tcpSocket);
 		} else if(this->params.mode == CommunicationMode::IPC) {
 			connect(static_cast<QLocalSocket*>(newConnection), &QLocalSocket::disconnected, this, &Broadcaster::onClientDisconnected);
 			localConnections.append(static_cast<QLocalSocket*>(newConnection));
@@ -302,6 +307,11 @@ void Broadcaster::broadcast(void* buffer, quint32 bufferSizeInBytes, quint16 fra
 	// write header information to stream
 	if(this->params.sendHeader) {
 		stream << startIdentifier << bufferSizeInBytes << frameWidth << frameHeight << bitDepth;
+		if(this->params.sendTimestamp) {
+			// Send-side wall-clock ms since epoch. Consumed by measure_delay.py
+			// to compute the send->recv latency.
+			stream << static_cast<quint64>(QDateTime::currentMSecsSinceEpoch());
+		}
 	}
 
 	// append the actual OCT image data

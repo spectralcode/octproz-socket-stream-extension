@@ -37,6 +37,8 @@
 #define HOST_PORT "host_port"
 #define PIPE_NAME "pipe_name"
 #define SEND_HEADER "send_header"
+#define SEND_TIMESTAMP "send_timestamp"
+#define TCP_NO_DELAY "tcp_no_delay"
 #define CONNECTION_MODE "mode"
 #define AUTO_CONNECT_ENABLED "auto_connect_enabled"
 

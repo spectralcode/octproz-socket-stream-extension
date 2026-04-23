@@ -20,6 +20,8 @@ struct SocketStreamExtensionParameters {
 	QString ip;
 	quint16 port;
 	bool sendHeader;
+	bool sendTimestamp;  // append send-side wall-clock ms to header (requires sendHeader)
+	bool tcpNoDelay;     // disable Nagle on new TCP connections (TCP mode only)
 	bool autoConnect;
 };
 Q_DECLARE_METATYPE(SocketStreamExtensionParameters)

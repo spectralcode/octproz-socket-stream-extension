@@ -69,6 +69,8 @@ void SocketStreamExtensionForm::setSettings(QVariantMap settings) {
 	}
 
 	this->ui->checkBox_autoConnect->setChecked(settings.value(AUTO_CONNECT_ENABLED).toBool());
+	this->ui->checkBox_timestamp->setChecked(settings.value(SEND_TIMESTAMP).toBool());
+	this->ui->checkBox_tcpNoDelay->setChecked(settings.value(TCP_NO_DELAY).toBool());
 }
 
 void SocketStreamExtensionForm::getSettings(QVariantMap* settings) {
@@ -78,6 +80,8 @@ void SocketStreamExtensionForm::getSettings(QVariantMap* settings) {
 	settings->insert(SEND_HEADER, this->parameters.sendHeader);
 	settings->insert(CONNECTION_MODE, this->toInt(this->parameters.mode));
 	settings->insert(AUTO_CONNECT_ENABLED, this->parameters.autoConnect);
+	settings->insert(SEND_TIMESTAMP, this->parameters.sendTimestamp);
+	settings->insert(TCP_NO_DELAY, this->parameters.tcpNoDelay);
 }
 
 void SocketStreamExtensionForm::updateParams() {
@@ -87,6 +91,8 @@ void SocketStreamExtensionForm::updateParams() {
 	this->parameters.mode = this->fromInt(ui->comboBox_mode->currentData().toInt());
 	this->parameters.autoConnect = this->ui->checkBox_autoConnect->isChecked();
 	this->parameters.sendHeader = this->ui->checkBox_header->isChecked();
+	this->parameters.sendTimestamp = this->ui->checkBox_timestamp->isChecked();
+	this->parameters.tcpNoDelay = this->ui->checkBox_tcpNoDelay->isChecked();
 
 	emit paramsChanged(this->parameters);
 }
