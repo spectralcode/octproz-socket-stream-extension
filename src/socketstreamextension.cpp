@@ -189,10 +189,10 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 		this->handleSetCcCommand(command);
 	}
 	else if (command.compare("stream_raw", Qt::CaseInsensitive) == 0) {
-		this->streamRaw.storeRelaxed(1);
+		this->streamRaw.store(1);
 	}
 	else if (command.compare("stream_processed", Qt::CaseInsensitive) == 0) {
-		this->streamRaw.storeRelaxed(0);
+		this->streamRaw.store(0);
 	}
 	else {
 		emit error("Unknown command: " + command);
@@ -720,7 +720,7 @@ void SocketStreamExtension::autoConnect() {
 }
 
 void SocketStreamExtension::rawDataReceived(void* buffer, unsigned int bitDepth, unsigned int samplesPerLine, unsigned int linesPerFrame, unsigned int framesPerBuffer, unsigned int buffersPerVolume, unsigned int currentBufferNr) {
-	if(this->active && this->streamRaw.loadRelaxed() != 0 && this->rawGrabbingAllowed){
+	if(this->active && this->streamRaw.load() != 0 && this->rawGrabbingAllowed){
 		Q_UNUSED(buffersPerVolume)
 		Q_UNUSED(currentBufferNr)
 
@@ -744,7 +744,7 @@ void SocketStreamExtension::rawDataReceived(void* buffer, unsigned int bitDepth,
 }
 
 void SocketStreamExtension::processedDataReceived(void* buffer, unsigned int bitDepth, unsigned int samplesPerLine, unsigned int linesPerFrame, unsigned int framesPerBuffer, unsigned int buffersPerVolume, unsigned int currentBufferNr) {
-	if(this->active && this->streamRaw.loadRelaxed() == 0){
+	if(this->active && this->streamRaw.load() == 0){
 		Q_UNUSED(buffersPerVolume)
 		Q_UNUSED(currentBufferNr)
 
