@@ -564,6 +564,19 @@ void SocketStreamExtension::handleSetBgFrameCommand(const QString &command) {
 			}
 			params.insert("bscans", bscans);
 		}
+		else if (it.key() == "mode") {
+			QString mode = it.value().toString().trimmed().toLower();
+			if (mode == "subtraction" || mode == "subtract") {
+				params.insert("mode", "subtraction");
+			}
+			else if (mode == "normalize" || mode == "normalization") {
+				params.insert("mode", "normalize");
+			}
+			else {
+				emit error("Invalid set_bg_frame mode: " + it.value().toString());
+				return;
+			}
+		}
 		else {
 			emit error("Unknown set_bg_frame parameter: " + it.key());
 			return;

@@ -86,7 +86,7 @@ Examples:
 | `set_klin_coeffs:<c0>:<c1>:<c2>:<c3>` | Set k-linearization polynomial coefficients (double or `null`) |
 | `set_klin_curve:<v0>,<v1>,...,<vN>` | Set custom resampling curve (comma-separated floats) |
 | `load_klin_curve:<file_path>` | Load resampling curve from CSV file |
-| `set_bg_frame:enable=<0\|1>:bscans=<N>` | Configure static background-frame subtraction for line-field OCT |
+| `set_bg_frame:enable=<0\|1>:bscans=<N>:mode=<subtraction\|normalize>` | Configure background-frame correction for line-field OCT |
 | `set_continuous_bg:enable=<0\|1>:ema=<0\|1>` | Configure continuous background update mode |
 | `record_bg_frame` | Record a new static background frame |
 | `load_bg_frame:<file_path>` | Load a background frame from a `.raw` file |
@@ -121,7 +121,7 @@ Only specified keys are changed; omitted keys keep their current values.
 
 | Command | Description |
 |---------|-------------|
-| `set_bg_frame:enable=<0\|1>:bscans=<N>` | Configure static background-frame subtraction and the averaging count used when recording a new frame. |
+| `set_bg_frame:enable=<0\|1>:bscans=<N>:mode=<subtraction\|normalize>` | Configure background-frame correction, the averaging count used when recording a new frame, and the correction mode. |
 | `set_continuous_bg:enable=<0\|1>:ema=<0\|1>` | Configure continuous background estimation and select the averaging method. |
 | `record_bg_frame` | Record a new static background frame from the current acquisition. |
 | `load_bg_frame:<file_path>` | Load a previously saved background frame from disk. |
@@ -130,8 +130,11 @@ Only specified keys are changed; omitted keys keep their current values.
 | `set_full_range:enable=<0\|1>` | Enable or disable full-range line-field processing output. |
 | `set_cc:enable=<0\|1>:center=<0-1>:width=<0-1>:keep_positive=<0\|1>` | Configure complex conjugate artifact removal. |
 
+The optional `mode` key accepts `subtraction` for background subtraction only, or `normalize` for background subtraction and normalization. If omitted, the current correction mode is kept.
+
 Examples:
-- `set_bg_frame:enable=1:bscans=10` - Enable static background-frame subtraction and average 10 B-scans when recording a new frame.
+- `set_bg_frame:enable=1:bscans=10:mode=subtraction` - Enable background-frame subtraction and average 10 B-scans when recording a new frame.
+- `set_bg_frame:enable=1:mode=normalize` - Enable static background-frame subtraction and normalization while keeping the current averaging count.
 - `set_continuous_bg:enable=1:ema=1` - Enable continuous background estimation and use the exponential moving average method.
 - `set_continuous_bg:enable=0` - Disable continuous background estimation and keep the current `ema` setting unchanged.
 - `record_bg_frame` - Record a new static background frame from the current acquisition.
