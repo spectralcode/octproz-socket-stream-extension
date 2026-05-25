@@ -28,6 +28,7 @@
 
 #include <QCoreApplication>
 #include <QThread>
+#include <QAtomicInt>
 #include "octproz_devkit.h"
 #include "socketstreamextensionform.h"
 #include "broadcaster.h"
@@ -54,6 +55,7 @@ private:
 	SocketStreamExtensionParameters params;
 	bool widgetDisplayed;
 	bool active;
+	QAtomicInt streamRaw{0};
 
 	Broadcaster* broadcastServer;
 

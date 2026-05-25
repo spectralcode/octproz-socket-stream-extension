@@ -102,6 +102,8 @@
 		<button id="disconnectBtn" disabled>Disconnect</button><br>
 		<button id="startBtn">Start</button><br>
 		<button id="stopBtn">Stop</button><br>
+		<button id="streamRawBtn">Stream Raw</button><br>
+		<button id="streamProcessedBtn">Stream Processed</button><br>
 		<button id="rotateBtn" disabled>Rotate 90°</button><br>
 		<label for="pluginName">Plugin Name:</label><br>
 		<input type="text" id="pluginName" placeholder="e.g., Dispersion Estimator"><br>
@@ -307,6 +309,18 @@
 			if (socket && socket.readyState === WebSocket.OPEN) {
 				socket.send('remote_stop');
 				stopBtn.disabled = true;
+			}
+		});
+
+		// Event Listeners for Stream Raw / Stream Processed Buttons
+		document.getElementById('streamRawBtn').addEventListener('click', () => {
+			if (socket && socket.readyState === WebSocket.OPEN) {
+				socket.send('stream_raw');
+			}
+		});
+		document.getElementById('streamProcessedBtn').addEventListener('click', () => {
+			if (socket && socket.readyState === WebSocket.OPEN) {
+				socket.send('stream_processed');
 			}
 		});
 

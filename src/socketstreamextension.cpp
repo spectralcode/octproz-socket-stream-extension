@@ -188,6 +188,12 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 	else if (command.startsWith("set_cc", Qt::CaseInsensitive)) {
 		this->handleSetCcCommand(command);
 	}
+	else if (command.compare("stream_raw", Qt::CaseInsensitive) == 0) {
+		this->streamRaw.storeRelaxed(1);
+	}
+	else if (command.compare("stream_processed", Qt::CaseInsensitive) == 0) {
+		this->streamRaw.storeRelaxed(0);
+	}
 	else {
 		emit error("Unknown command: " + command);
 	}
@@ -714,18 +720,31 @@ void SocketStreamExtension::autoConnect() {
 }
 
 void SocketStreamExtension::rawDataReceived(void* buffer, unsigned int bitDepth, unsigned int samplesPerLine, unsigned int linesPerFrame, unsigned int framesPerBuffer, unsigned int buffersPerVolume, unsigned int currentBufferNr) {
-	//do nothing here as we do not need the raw data. Q_UNUSED is used to suppress compiler warnings
-	Q_UNUSED(buffer)
-	Q_UNUSED(bitDepth)
-	Q_UNUSED(samplesPerLine)
-	Q_UNUSED(linesPerFrame)
-	Q_UNUSED(framesPerBuffer)
-	Q_UNUSED(buffersPerVolume)
-	Q_UNUSED(currentBufferNr)
+	if(this->active && this->streamRaw.loadRelaxed() != 0 && this->rawGrabbingAllowed){
+		Q_UNUSED(buffersPerVolume)
+		Q_UNUSED(currentBufferNr)
+
+		size_t bytesPerSample = ceil(static_cast<double>(bitDepth) / 8.0);
+		size_t bufferSizeInBytes = samplesPerLine * linesPerFrame * framesPerBuffer * bytesPerSample;
+
+		quint32 quintBufferSizeInBytes = static_cast<quint32>(bufferSizeInBytes);
+		quint16 quintFramesPerBuffer = static_cast<quint16>(framesPerBuffer);
+		quint16 quintFrameWidth = static_cast<quint16>(samplesPerLine);
+		quint16 quintFrameHeight = static_cast<quint16>(linesPerFrame);
+		quint8 quintBitDepth = static_cast<quint8>(bitDepth);
+
+		QMetaObject::invokeMethod(this->broadcastServer, "broadcast", Qt::QueuedConnection,
+								  Q_ARG(void*, buffer),
+								  Q_ARG(quint32, quintBufferSizeInBytes),
+								  Q_ARG(quint16, quintFramesPerBuffer),
+								  Q_ARG(quint16, quintFrameWidth),
+								  Q_ARG(quint16, quintFrameHeight),
+								  Q_ARG(quint8, quintBitDepth));
+	}
 }
 
 void SocketStreamExtension::processedDataReceived(void* buffer, unsigned int bitDepth, unsigned int samplesPerLine, unsigned int linesPerFrame, unsigned int framesPerBuffer, unsigned int buffersPerVolume, unsigned int currentBufferNr) {
-	if(this->active){
+	if(this->active && this->streamRaw.loadRelaxed() == 0){
 		Q_UNUSED(buffersPerVolume)
 		Q_UNUSED(currentBufferNr)
 
