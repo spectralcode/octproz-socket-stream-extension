@@ -86,6 +86,8 @@ Examples:
 | `set_klin_coeffs:<c0>:<c1>:<c2>:<c3>` | Set k-linearization polynomial coefficients (double or `null`) |
 | `set_klin_curve:<v0>,<v1>,...,<vN>` | Set custom resampling curve (comma-separated floats) |
 | `load_klin_curve:<file_path>` | Load resampling curve from CSV file |
+| `stream_raw` | Stream raw acquisition buffers instead of processed OCT data |
+| `stream_processed` | Stream processed OCT data |
 | `set_bg_frame:enable=<0\|1>:bscans=<N>:mode=<subtraction\|normalize>` | Configure background-frame correction for line-field OCT |
 | `set_continuous_bg:enable=<0\|1>:ema=<0\|1>` | Configure continuous background update mode |
 | `record_bg_frame` | Record a new static background frame |
