@@ -188,11 +188,25 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 	else if (command.startsWith("set_cc", Qt::CaseInsensitive)) {
 		this->handleSetCcCommand(command);
 	}
+	else if (command.startsWith("set_raw_only_mode", Qt::CaseInsensitive)) {
+		this->handleSetRawOnlyModeCommand(command);
+	}
+	else if (command.startsWith("set_raw_only_params", Qt::CaseInsensitive)) {
+		this->handleSetRawOnlyParamsCommand(command);
+	}
 	else if (command.compare("stream_raw", Qt::CaseInsensitive) == 0) {
+		this->restoreProcessedStreamAfterRawOnly.store(0);
 		this->streamRaw.store(1);
 	}
 	else if (command.compare("stream_processed", Qt::CaseInsensitive) == 0) {
+		this->restoreProcessedStreamAfterRawOnly.store(0);
 		this->streamRaw.store(0);
+		if (this->rawOnlyModeEnabled.load() != 0) {
+			QVariantMap params;
+			params.insert("enable", false);
+			this->rawOnlyModeEnabled.store(0);
+			emit appCommandRequest("set_raw_only_mode", params);
+		}
 	}
 	else {
 		emit error("Unknown command: " + command);
@@ -716,6 +730,86 @@ void SocketStreamExtension::handleSetCcCommand(const QString &command) {
 	emit appCommandRequest("set_cc", params);
 }
 
+bool SocketStreamExtension::parseRawOnlyParams(const QVariantMap &rawParams, QVariantMap &params, QString &errorMessage) const {
+	const QStringList validKeys = {"samples", "ascans", "bscans", "buffers", "bitdepth"};
+	for (auto it = rawParams.cbegin(); it != rawParams.cend(); ++it) {
+		if (!validKeys.contains(it.key())) {
+			errorMessage = "unknown parameter: " + it.key();
+			return false;
+		}
+
+		bool ok;
+		unsigned int value = it.value().toString().toUInt(&ok);
+		if (!ok || value == 0) {
+			errorMessage = "invalid integer value for " + it.key() + ": " + it.value().toString();
+			return false;
+		}
+
+		params.insert(it.key(), value);
+	}
+	return true;
+}
+
+void SocketStreamExtension::handleSetRawOnlyModeCommand(const QString &command) {
+	QVariantMap rawParams;
+	QString errorMessage;
+	if (!this->parseKeyValueCommand(command, rawParams, errorMessage)) {
+		emit error("Invalid set_raw_only_mode command format: " + errorMessage);
+		return;
+	}
+
+	if (!rawParams.contains("enable")) {
+		emit error("Invalid set_raw_only_mode command format: missing enable parameter");
+		return;
+	}
+
+	bool enable;
+	if (!this->parseBoolValue(rawParams.value("enable").toString(), enable)) {
+		emit error("Invalid boolean value for set_raw_only_mode enable: " + rawParams.value("enable").toString());
+		return;
+	}
+
+	QVariantMap params;
+	params.insert("enable", enable);
+	rawParams.remove("enable");
+	if (!this->parseRawOnlyParams(rawParams, params, errorMessage)) {
+		emit error("Invalid set_raw_only_mode command format: " + errorMessage);
+		return;
+	}
+
+	if (enable) {
+		if (this->streamRaw.load() == 0) {
+			this->restoreProcessedStreamAfterRawOnly.store(1);
+		}
+		this->rawOnlyModeEnabled.store(1);
+		this->streamRaw.store(1);
+	} else {
+		this->rawOnlyModeEnabled.store(0);
+		if (this->restoreProcessedStreamAfterRawOnly.load() != 0) {
+			this->streamRaw.store(0);
+			this->restoreProcessedStreamAfterRawOnly.store(0);
+		}
+	}
+	emit appCommandRequest("set_raw_only_mode", params);
+}
+
+void SocketStreamExtension::handleSetRawOnlyParamsCommand(const QString &command) {
+	QVariantMap rawParams;
+	QString errorMessage;
+	if (!this->parseKeyValueCommand(command, rawParams, errorMessage)) {
+		emit error("Invalid set_raw_only_params command format: " + errorMessage);
+		return;
+	}
+
+	QVariantMap params;
+	if (!this->parseRawOnlyParams(rawParams, params, errorMessage)) {
+		emit error("Invalid set_raw_only_params command format: " + errorMessage);
+		return;
+	}
+
+	emit appCommandRequest("set_raw_only_params", params);
+}
+
 void SocketStreamExtension::autoConnect() {
 	//get current settings from the form
 	QVariantMap currentSettings;
@@ -739,8 +833,8 @@ void SocketStreamExtension::rawDataReceived(void* buffer, unsigned int bitDepth,
 
 		size_t bytesPerSample = ceil(static_cast<double>(bitDepth) / 8.0);
 		size_t bufferSizeInBytes = samplesPerLine * linesPerFrame * framesPerBuffer * bytesPerSample;
-
 		quint32 quintBufferSizeInBytes = static_cast<quint32>(bufferSizeInBytes);
+
 		quint16 quintFramesPerBuffer = static_cast<quint16>(framesPerBuffer);
 		quint16 quintFrameWidth = static_cast<quint16>(samplesPerLine);
 		quint16 quintFrameHeight = static_cast<quint16>(linesPerFrame);

@@ -56,6 +56,8 @@ private:
 	bool widgetDisplayed;
 	bool active;
 	QAtomicInt streamRaw{0};
+	QAtomicInt rawOnlyModeEnabled{0};
+	QAtomicInt restoreProcessedStreamAfterRawOnly{0};
 
 	Broadcaster* broadcastServer;
 
@@ -80,6 +82,9 @@ private:
 	void handleClearBgFrameCommand();
 	void handleSetFullRangeCommand(const QString &command);
 	void handleSetCcCommand(const QString &command);
+	void handleSetRawOnlyModeCommand(const QString &command);
+	void handleSetRawOnlyParamsCommand(const QString &command);
+	bool parseRawOnlyParams(const QVariantMap &rawParams, QVariantMap &params, QString &errorMessage) const;
 	bool parseBoolValue(const QString &value, bool &parsedValue) const;
 	bool parseKeyValueCommand(const QString &command, QVariantMap &rawParams, QString &errorMessage) const;
 	void autoConnect();

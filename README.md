@@ -88,6 +88,8 @@ Examples:
 | `load_klin_curve:<file_path>` | Load resampling curve from CSV file |
 | `stream_raw` | Stream raw acquisition buffers instead of processed OCT data |
 | `stream_processed` | Stream processed OCT data |
+| `set_raw_only_mode:enable=<0\|1>` | Enable or disable raw only mode |
+| `set_raw_only_params:samples=<N>:ascans=<N>:bscans=<N>:buffers=<N>:bitdepth=<N>` | Configure the raw only mode acquisition profile |
 | `set_bg_frame:enable=<0\|1>:bscans=<N>:mode=<subtraction\|normalize>` | Configure background-frame correction for line-field OCT |
 | `set_continuous_bg:enable=<0\|1>:ema=<0\|1>` | Configure continuous background update mode |
 | `record_bg_frame` | Record a new static background frame |
@@ -114,6 +116,26 @@ The CSV file should use semicolons as delimiters with resampling values in the s
 Examples:
 - Windows: `load_klin_curve:C:/Users/username/curves/klin_curve.csv`
 - Linux: `load_klin_curve:/home/username/curves/klin_curve.csv`
+
+### Raw Only Mode
+
+Raw only mode streams raw acquisition buffers without GPU processing. It uses a separate acquisition profile, so normal acquisition parameters are not changed by raw only commands.
+
+Only acquisition systems that explicitly support raw only mode can use these commands. Unsupported systems reject the request.
+
+| Command | Description |
+|---------|-------------|
+| `set_raw_only_mode:enable=<0\|1>` | Enable or disable raw only mode. |
+| `set_raw_only_mode:enable=1:samples=<N>:ascans=<N>:bscans=<N>:buffers=<N>:bitdepth=<N>` | Update raw only parameters and enable raw only mode in one command. |
+| `set_raw_only_params:samples=<N>:ascans=<N>:bscans=<N>:buffers=<N>:bitdepth=<N>` | Update the stored raw only acquisition profile. All keys are optional, but at least one key must be provided. |
+
+When raw only mode is enabled, Socket Stream automatically switches to raw streaming. If acquisition is already running, OCTproZ switches modes at runtime without restarting acquisition or processing. Normal GPU processing resources stay initialized and the CUDA pipeline is bypassed while raw only mode is active.
+
+Examples:
+- `set_raw_only_params:samples=2048:ascans=512:bscans=1:buffers=1:bitdepth=12`
+- `set_raw_only_mode:enable=1`
+- `set_raw_only_mode:enable=1:samples=1024`
+- `set_raw_only_mode:enable=0`
 
 ### Line-Field OCT Commands
 

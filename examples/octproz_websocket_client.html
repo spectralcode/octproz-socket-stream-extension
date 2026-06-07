@@ -26,6 +26,7 @@
 			width: 200px;
 			border: none;
 			border-radius: 3px;
+			box-sizing: border-box;
 		}
 		#controls button {
 			margin: 5px 0;
@@ -36,9 +37,52 @@
 			background-color: #555;
 			color: #fff;
 			cursor: pointer;
+			box-sizing: border-box;
 		}
 		#controls button:hover {
 			background-color: #777;
+		}
+		#controls .button-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 6px 8px;
+			width: 220px;
+			margin: 5px 0;
+		}
+		#controls .button-grid button {
+			width: 100%;
+			margin: 0;
+		}
+		#controls .section {
+			margin-top: 8px;
+			padding-top: 8px;
+			border-top: 1px solid #555;
+		}
+		#controls summary {
+			cursor: pointer;
+			font-weight: bold;
+			width: 220px;
+			user-select: none;
+		}
+		#controls .collapsible-content {
+			margin-top: 6px;
+		}
+		#controls .wide-button {
+			width: 220px;
+		}
+		#controls .raw-grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 2px 8px;
+			width: 220px;
+			margin: 4px 0;
+		}
+		#controls .raw-grid label {
+			font-size: 12px;
+		}
+		#controls .raw-grid input {
+			width: 90px;
+			margin: 2px 0;
 		}
 		#info {
 			position: absolute;
@@ -87,8 +131,7 @@
 			user-select: none; /* Prevent text selection while dragging */
 		}
 		#rotateBtn {
-			margin-top: 10px;
-			width: 100px;
+			margin-top: 5px;
 		}
 	</style>
 </head>
@@ -98,24 +141,54 @@
 		<input type="text" id="serverIp" placeholder="e.g., 127.0.0.1" value="127.0.0.1"><br>
 		<label for="serverPort">Port:</label><br>
 		<input type="number" id="serverPort" placeholder="e.g., 1234" value="1234"><br>
-		<button id="connectBtn">Connect</button><br>
-		<button id="disconnectBtn" disabled>Disconnect</button><br>
-		<button id="startBtn">Start</button><br>
-		<button id="stopBtn">Stop</button><br>
-		<button id="streamRawBtn">Stream Raw</button><br>
-		<button id="streamProcessedBtn">Stream Processed</button><br>
-		<button id="rotateBtn" disabled>Rotate 90°</button><br>
-		<label for="pluginName">Plugin Name:</label><br>
-		<input type="text" id="pluginName" placeholder="e.g., Dispersion Estimator"><br>
-		<label for="pluginCommand">Plugin Command:</label><br>
-		<input type="text" id="pluginCommand" placeholder="e.g., startSingleFetch"><br>
-		<button id="sendPluginCmdBtn">Send Plugin Cmd</button><br>
+		<div class="button-grid">
+			<button id="connectBtn">Connect</button>
+			<button id="disconnectBtn" disabled>Disconnect</button>
+			<button id="startBtn">Start</button>
+			<button id="stopBtn">Stop</button>
+			<button id="streamProcessedBtn">Stream Processed</button>
+			<button id="streamRawBtn">Stream Raw</button>
+		</div>
+		<button id="rotateBtn" class="wide-button" disabled>Rotate 90°</button><br>
+		<details class="section">
+			<summary>Misc</summary>
+			<div class="collapsible-content">
+				<label>Raw Only Mode:</label><br>
+				<div class="raw-grid">
+					<label for="rawOnlySamples">Samples</label>
+					<label for="rawOnlyAscans">Ascans</label>
+					<input type="number" id="rawOnlySamples" min="1" placeholder="2048">
+					<input type="number" id="rawOnlyAscans" min="1" placeholder="512">
+					<label for="rawOnlyBscans">Bscans</label>
+					<label for="rawOnlyBuffers">Buffers</label>
+					<input type="number" id="rawOnlyBscans" min="1" placeholder="1">
+					<input type="number" id="rawOnlyBuffers" min="1" placeholder="1">
+					<label for="rawOnlyBitDepth">Bit depth</label>
+					<span></span>
+					<input type="number" id="rawOnlyBitDepth" min="1" placeholder="12">
+				</div>
+				<button id="setRawOnlyParamsBtn" class="wide-button">Set Raw Only Params</button><br>
+				<div class="button-grid">
+					<button id="enableRawOnlyBtn">Enable Raw Only</button>
+					<button id="disableRawOnlyBtn">Disable Raw Only</button>
+				</div>
+				<div class="section">
+					<label>Custom Plugin Commands:</label><br>
+					<label for="pluginName">Plugin Name:</label><br>
+					<input type="text" id="pluginName" placeholder="e.g., Dispersion Estimator"><br>
+					<label for="pluginCommand">Plugin Command:</label><br>
+					<input type="text" id="pluginCommand" placeholder="e.g., startSingleFetch"><br>
+					<button id="sendPluginCmdBtn" class="wide-button">Send Plugin Cmd</button><br>
+				</div>
+			</div>
+		</details>
 	</div>
 
 	<div id="info">
 		<h3>Header Information</h3>
 		<p id="headerInfo">No Data</p>
 		<div id="fpsInfo">FPS: 0.00</div>
+		<div id="commandInfo">Last command: none</div>
 	</div>
 
 	<div id="canvasContainer">
@@ -128,6 +201,7 @@
 		const ctx = canvas.getContext('2d');
 		const fpsInfo = document.getElementById('fpsInfo');
 		const headerInfo = document.getElementById('headerInfo');
+		const commandInfo = document.getElementById('commandInfo');
 		const rotateBtn = document.getElementById('rotateBtn');
 		const status = document.getElementById('status');
 
@@ -140,6 +214,16 @@
 		const pluginNameInput = document.getElementById('pluginName');
 		const pluginCommandInput = document.getElementById('pluginCommand');
 		const sendPluginCmdBtn = document.getElementById('sendPluginCmdBtn');
+		const setRawOnlyParamsBtn = document.getElementById('setRawOnlyParamsBtn');
+		const enableRawOnlyBtn = document.getElementById('enableRawOnlyBtn');
+		const disableRawOnlyBtn = document.getElementById('disableRawOnlyBtn');
+		const rawOnlyParamInputs = [
+			{ key: 'samples', input: document.getElementById('rawOnlySamples') },
+			{ key: 'ascans', input: document.getElementById('rawOnlyAscans') },
+			{ key: 'bscans', input: document.getElementById('rawOnlyBscans') },
+			{ key: 'buffers', input: document.getElementById('rawOnlyBuffers') },
+			{ key: 'bitdepth', input: document.getElementById('rawOnlyBitDepth') }
+		];
 
 		let frameCount = 0;
 		let currentFps = 0;
@@ -164,6 +248,37 @@
 			frameCount = 0;
 			fpsInfo.textContent = `FPS: ${currentFps.toFixed(2)}`;
 		}, 1000);
+
+		function sendCommand(command) {
+			if (socket && socket.readyState === WebSocket.OPEN) {
+				socket.send(command);
+				commandInfo.textContent = `Last command: ${command}`;
+				console.log('Sent command:', command);
+				return true;
+			} else {
+				alert('Socket is not connected.');
+				return false;
+			}
+		}
+
+		function buildRawOnlyParamSuffix() {
+			const params = [];
+			for (const param of rawOnlyParamInputs) {
+				const value = param.input.value.trim();
+				if (!value) {
+					continue;
+				}
+
+				const numberValue = Number(value);
+				if (!Number.isInteger(numberValue) || numberValue <= 0) {
+					alert(`Invalid ${param.key} value.`);
+					return null;
+				}
+
+				params.push(`${param.key}=${numberValue}`);
+			}
+			return params.join(':');
+		}
 
 		// Event Listener for Connect Button
 		connectBtn.addEventListener('click', () => {
@@ -190,10 +305,16 @@
 			};
 
 			socket.onmessage = (event) => {
+				if (typeof event.data === 'string') {
+					commandInfo.textContent = `Message: ${event.data.trim()}`;
+					console.log('Received text message:', event.data);
+					return;
+				}
+
 				const arrayBuffer = event.data;
 				const uint8Array = new Uint8Array(arrayBuffer);
 
-				// First 13 bytes are the header
+				// First 13 bytes are the header. Timestamp-enabled streams add 8 bytes.
 				if (uint8Array.length < 13) {
 					console.warn('Insufficient data for header');
 					return;
@@ -206,6 +327,19 @@
 				const frameWidth = dataView.getUint16(8, false);
 				const frameHeight = dataView.getUint16(10, false);
 				const bitDepth = uint8Array[12];
+				const bytesPerSample = Math.ceil(bitDepth / 8);
+				const pixelsPerFrame = frameWidth * frameHeight;
+				const framesInBuffer = pixelsPerFrame > 0 && bytesPerSample > 0
+					? bufferSizeInBytes / (pixelsPerFrame * bytesPerSample)
+					: 0;
+				const framesInBufferText = Number.isInteger(framesInBuffer) ? framesInBuffer : framesInBuffer.toFixed(2);
+				let headerSize = 13;
+				let timestampInfo = '';
+				if (uint8Array.length >= 21 && uint8Array.length - 21 === bufferSizeInBytes) {
+					headerSize = 21;
+					const timestampMs = dataView.getUint32(13, false) * 4294967296 + dataView.getUint32(17, false);
+					timestampInfo = `<strong>Timestamp:</strong> ${timestampMs}<br>`;
+				}
 
 				// Check Magic Number
 				const MAGIC_NUMBER = 299792458; 
@@ -220,11 +354,13 @@
 					<strong>Buffer Size (Bytes):</strong> ${bufferSizeInBytes}<br>
 					<strong>Frame Width:</strong> ${frameWidth}<br>
 					<strong>Frame Height:</strong> ${frameHeight}<br>
-					<strong>Bit Depth:</strong> ${bitDepth}
+					<strong>Frames in Buffer:</strong> ${framesInBufferText}<br>
+					<strong>Bit Depth:</strong> ${bitDepth}<br>
+					${timestampInfo}
 				`;
 
 				// Assume remaining bytes are image data
-				const imageDataArray = uint8Array.slice(13);
+				const imageDataArray = uint8Array.slice(headerSize, headerSize + bufferSizeInBytes);
 
 				// Normalize image data based on bit depth
 				let normalizedData;
@@ -298,30 +434,49 @@
 
 		// Event Listener for Start Button
 		startBtn.addEventListener('click', () => {
-			if (socket && socket.readyState === WebSocket.OPEN) {
-				socket.send('remote_start');
+			if (sendCommand('remote_start')) {
 				stopBtn.disabled = false; // Keeping Stop enabled as per user request
 			}
 		});
 
 		// Event Listener for Stop Button
 		stopBtn.addEventListener('click', () => {
-			if (socket && socket.readyState === WebSocket.OPEN) {
-				socket.send('remote_stop');
+			if (sendCommand('remote_stop')) {
 				stopBtn.disabled = true;
 			}
 		});
 
 		// Event Listeners for Stream Raw / Stream Processed Buttons
 		document.getElementById('streamRawBtn').addEventListener('click', () => {
-			if (socket && socket.readyState === WebSocket.OPEN) {
-				socket.send('stream_raw');
-			}
+			sendCommand('stream_raw');
 		});
 		document.getElementById('streamProcessedBtn').addEventListener('click', () => {
-			if (socket && socket.readyState === WebSocket.OPEN) {
-				socket.send('stream_processed');
+			sendCommand('stream_processed');
+		});
+
+		setRawOnlyParamsBtn.addEventListener('click', () => {
+			const params = buildRawOnlyParamSuffix();
+			if (params === null) {
+				return;
 			}
+			if (!params) {
+				alert('Enter at least one raw only parameter.');
+				return;
+			}
+			sendCommand(`set_raw_only_params:${params}`);
+		});
+
+		enableRawOnlyBtn.addEventListener('click', () => {
+			const params = buildRawOnlyParamSuffix();
+			if (params === null) {
+				return;
+			}
+			const command = params ? `set_raw_only_mode:enable=1:${params}` : 'set_raw_only_mode:enable=1';
+			sendCommand(command);
+		});
+
+		disableRawOnlyBtn.addEventListener('click', () => {
+			sendCommand('set_raw_only_mode:enable=0');
 		});
 
 		// Event Listener for Rotate Button
@@ -341,8 +496,7 @@
 				}
 				// Construct command: remote_plugin_control, PluginName, Command
 				const remoteCmd = `remote_plugin_control, ${targetPlugin}, ${pluginCmd}`;
-				socket.send(remoteCmd);
-				console.log("Sent remote plugin control command:", remoteCmd);
+				sendCommand(remoteCmd);
 			} else {
 				alert('Socket is not connected.');
 			}
