@@ -84,6 +84,8 @@ private:
 	void handleSetCcCommand(const QString &command);
 	void handleSetRawOnlyModeCommand(const QString &command);
 	void handleSetRawOnlyParamsCommand(const QString &command);
+	void handleSetNormalAcquisitionParamsCommand(const QString &command);
+	void handleSetCameraControlFileCommand(const QString &command);
 	bool parseRawOnlyParams(const QVariantMap &rawParams, QVariantMap &params, QString &errorMessage) const;
 	bool parseBoolValue(const QString &value, bool &parsedValue) const;
 	bool parseKeyValueCommand(const QString &command, QVariantMap &rawParams, QString &errorMessage) const;

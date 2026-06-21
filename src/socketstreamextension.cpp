@@ -194,6 +194,12 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 	else if (command.startsWith("set_raw_only_params", Qt::CaseInsensitive)) {
 		this->handleSetRawOnlyParamsCommand(command);
 	}
+	else if (command.startsWith("set_normal_acquisition_params", Qt::CaseInsensitive)) {
+		this->handleSetNormalAcquisitionParamsCommand(command);
+	}
+	else if (command.startsWith("set_camera_control_file", Qt::CaseInsensitive)) {
+		this->handleSetCameraControlFileCommand(command);
+	}
 	else if (command.compare("stream_raw", Qt::CaseInsensitive) == 0) {
 		this->restoreProcessedStreamAfterRawOnly.store(0);
 		this->streamRaw.store(1);
@@ -808,6 +814,78 @@ void SocketStreamExtension::handleSetRawOnlyParamsCommand(const QString &command
 	}
 
 	emit appCommandRequest("set_raw_only_params", params);
+}
+
+void SocketStreamExtension::handleSetNormalAcquisitionParamsCommand(const QString &command) {
+	QVariantMap rawParams;
+	QString errorMessage;
+	if (!this->parseKeyValueCommand(command, rawParams, errorMessage)) {
+		emit error("Invalid set_normal_acquisition_params command format: " + errorMessage);
+		return;
+	}
+
+	QVariantMap params;
+	if (!this->parseRawOnlyParams(rawParams, params, errorMessage)) {
+		emit error("Invalid set_normal_acquisition_params command format: " + errorMessage);
+		return;
+	}
+
+	emit sendCommand(this->getName(), "IKap OCT System", "set_normal_acquisition_params", params);
+}
+
+void SocketStreamExtension::handleSetCameraControlFileCommand(const QString &command) {
+	int colonIndex = command.indexOf(':');
+	if (colonIndex < 0 || colonIndex == command.size() - 1) {
+		emit error("Invalid set_camera_control_file command format: missing parameters");
+		return;
+	}
+
+	QString payload = command.mid(colonIndex + 1);
+	int pathKeyIndex = -1;
+	int pathValueIndex = -1;
+	if (payload.startsWith("path=", Qt::CaseInsensitive)) {
+		pathKeyIndex = 0;
+		pathValueIndex = 5;
+	} else {
+		pathKeyIndex = payload.indexOf(":path=", 0, Qt::CaseInsensitive);
+		if (pathKeyIndex >= 0) {
+			pathValueIndex = pathKeyIndex + 6;
+		}
+	}
+	if (pathKeyIndex < 0) {
+		emit error("Invalid set_camera_control_file command format: missing path parameter");
+		return;
+	}
+
+	QString path = payload.mid(pathValueIndex).trimmed();
+	QString prefix = payload.left(pathKeyIndex);
+	if (prefix.endsWith(':')) {
+		prefix.chop(1);
+	}
+
+	QVariantMap rawParams;
+	QString errorMessage;
+	QString prefixCommand = command.left(colonIndex) + ":" + prefix;
+	if (!this->parseKeyValueCommand(prefixCommand, rawParams, errorMessage)) {
+		emit error("Invalid set_camera_control_file command format: " + errorMessage);
+		return;
+	}
+
+	if (rawParams.size() != 1 || !rawParams.contains("mode")) {
+		emit error("Invalid set_camera_control_file command format: expected mode and path parameters");
+		return;
+	}
+
+	QString mode = rawParams.value("mode").toString().trimmed().toLower();
+	if (mode != "normal" && mode != "raw_only") {
+		emit error("Invalid set_camera_control_file mode: " + mode);
+		return;
+	}
+
+	QVariantMap params;
+	params.insert("mode", mode);
+	params.insert("path", path);
+	emit sendCommand(this->getName(), "IKap OCT System", "set_camera_control_file", params);
 }
 
 void SocketStreamExtension::autoConnect() {
