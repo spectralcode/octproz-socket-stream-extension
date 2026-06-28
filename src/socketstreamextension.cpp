@@ -197,8 +197,17 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 	else if (command.startsWith("set_normal_acquisition_params", Qt::CaseInsensitive)) {
 		this->handleSetNormalAcquisitionParamsCommand(command);
 	}
+	else if (command.startsWith("set_camera_control_file_usage", Qt::CaseInsensitive)) {
+		this->handleSetCameraControlFileUsageCommand(command);
+	}
 	else if (command.startsWith("set_camera_control_file", Qt::CaseInsensitive)) {
 		this->handleSetCameraControlFileCommand(command);
+	}
+	else if (command.startsWith("set_camera_params_usage", Qt::CaseInsensitive)) {
+		this->handleSetCameraParamsUsageCommand(command);
+	}
+	else if (command.startsWith("set_camera_params", Qt::CaseInsensitive)) {
+		this->handleSetCameraParamsCommand(command);
 	}
 	else if (command.compare("stream_raw", Qt::CaseInsensitive) == 0) {
 		this->restoreProcessedStreamAfterRawOnly.store(0);
@@ -885,7 +894,124 @@ void SocketStreamExtension::handleSetCameraControlFileCommand(const QString &com
 	QVariantMap params;
 	params.insert("mode", mode);
 	params.insert("path", path);
-	emit sendCommand(this->getName(), "IKap OCT System", "set_camera_control_file", params);
+	emit appCommandRequest("set_camera_control_file", params);
+}
+
+void SocketStreamExtension::handleSetCameraControlFileUsageCommand(const QString &command) {
+	QVariantMap rawParams;
+	QString errorMessage;
+	if (!this->parseKeyValueCommand(command, rawParams, errorMessage)) {
+		emit error("Invalid set_camera_control_file_usage command format: " + errorMessage);
+		return;
+	}
+
+	if (rawParams.size() != 2 || !rawParams.contains("mode") || !rawParams.contains("enable")) {
+		emit error("Invalid set_camera_control_file_usage command format: expected mode and enable parameters");
+		return;
+	}
+
+	QString mode = rawParams.value("mode").toString().trimmed().toLower();
+	if (mode != "normal" && mode != "raw_only") {
+		emit error("Invalid set_camera_control_file_usage mode: " + mode);
+		return;
+	}
+
+	bool enable;
+	if (!this->parseBoolValue(rawParams.value("enable").toString(), enable)) {
+		emit error("Invalid boolean value for set_camera_control_file_usage enable: " + rawParams.value("enable").toString());
+		return;
+	}
+
+	QVariantMap params;
+	params.insert("mode", mode);
+	params.insert("enable", enable);
+	emit appCommandRequest("set_camera_control_file_usage", params);
+}
+
+void SocketStreamExtension::handleSetCameraParamsCommand(const QString &command) {
+	QVariantMap rawParams;
+	QString errorMessage;
+	if (!this->parseKeyValueCommand(command, rawParams, errorMessage)) {
+		emit error("Invalid set_camera_params command format: " + errorMessage);
+		return;
+	}
+
+	if (!rawParams.contains("mode")) {
+		emit error("Invalid set_camera_params command format: missing mode parameter");
+		return;
+	}
+
+	QString mode = rawParams.value("mode").toString().trimmed().toLower();
+	if (mode != "normal" && mode != "raw_only") {
+		emit error("Invalid set_camera_params mode: " + mode);
+		return;
+	}
+
+	QVariantMap params;
+	params.insert("mode", mode);
+	rawParams.remove("mode");
+	if (rawParams.isEmpty()) {
+		emit error("Invalid set_camera_params command format: expected exposure, line_rate or gain parameter");
+		return;
+	}
+
+	const QStringList validKeys = {"exposure", "line_rate", "gain"};
+	for (auto it = rawParams.cbegin(); it != rawParams.cend(); ++it) {
+		if (!validKeys.contains(it.key())) {
+			emit error("Unknown set_camera_params parameter: " + it.key());
+			return;
+		}
+
+		bool ok;
+		double value = it.value().toString().toDouble(&ok);
+		if (!ok) {
+			emit error(QString("Invalid numeric value for set_camera_params %1: %2").arg(it.key(), it.value().toString()));
+			return;
+		}
+		if ((it.key() == "exposure" || it.key() == "gain") && value < 0.0) {
+			emit error(QString("Invalid set_camera_params %1 value: %2").arg(it.key(), it.value().toString()));
+			return;
+		}
+		if (it.key() == "line_rate" && value <= 0.0) {
+			emit error("Invalid set_camera_params line_rate value: " + it.value().toString());
+			return;
+		}
+
+		params.insert(it.key(), value);
+	}
+
+	emit appCommandRequest("set_camera_params", params);
+}
+
+void SocketStreamExtension::handleSetCameraParamsUsageCommand(const QString &command) {
+	QVariantMap rawParams;
+	QString errorMessage;
+	if (!this->parseKeyValueCommand(command, rawParams, errorMessage)) {
+		emit error("Invalid set_camera_params_usage command format: " + errorMessage);
+		return;
+	}
+
+	if (rawParams.size() != 2 || !rawParams.contains("mode") || !rawParams.contains("enable")) {
+		emit error("Invalid set_camera_params_usage command format: expected mode and enable parameters");
+		return;
+	}
+
+	QString mode = rawParams.value("mode").toString().trimmed().toLower();
+	if (mode != "normal" && mode != "raw_only") {
+		emit error("Invalid set_camera_params_usage mode: " + mode);
+		return;
+	}
+
+	bool enable;
+	if (!this->parseBoolValue(rawParams.value("enable").toString(), enable)) {
+		emit error("Invalid boolean value for set_camera_params_usage enable: " + rawParams.value("enable").toString());
+		return;
+	}
+
+	QVariantMap params;
+	params.insert("mode", mode);
+	params.insert("enable", enable);
+	emit appCommandRequest("set_camera_params_usage", params);
 }
 
 void SocketStreamExtension::autoConnect() {
