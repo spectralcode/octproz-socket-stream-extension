@@ -839,7 +839,7 @@ void SocketStreamExtension::handleSetNormalAcquisitionParamsCommand(const QStrin
 		return;
 	}
 
-	emit sendCommand(this->getName(), "IKap OCT System", "set_normal_acquisition_params", params);
+	emit appCommandRequest("set_normal_acquisition_params", params);
 }
 
 void SocketStreamExtension::handleSetCameraControlFileCommand(const QString &command) {
