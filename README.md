@@ -90,7 +90,7 @@ Examples:
 | `stream_processed` | Stream processed OCT data |
 | `set_raw_only_mode:enable=<0\|1>` | Enable or disable raw only mode |
 | `set_raw_only_params:samples=<N>:ascans=<N>:bscans=<N>:buffers=<N>:bitdepth=<N>` | Configure the raw only mode acquisition profile |
-| `set_bg_frame:enable=<0\|1>:bscans=<N>:mode=<subtraction\|normalize>` | Configure background-frame correction for line-field OCT |
+| `set_bg_frame:enable=<0\|1>:bscans=<N>:mode=<subtraction\|normalize>:smooth=<0\|1>:smooth_window=<N>` | Configure background-frame correction for line-field OCT |
 | `set_continuous_bg:enable=<0\|1>:ema=<0\|1>` | Configure continuous background update mode |
 | `record_bg_frame` | Record a new static background frame |
 | `load_bg_frame:<file_path>` | Load a background frame from a `.raw` file |
@@ -98,6 +98,7 @@ Examples:
 | `clear_bg_frame` | Clear the stored background frame and disable background subtraction |
 | `set_full_range:enable=<0\|1>` | Enable or disable full-range line-field processing |
 | `set_cc:enable=<0\|1>:center=<0-1>:width=<0-1>:keep_positive=<0\|1>` | Configure complex conjugate artifact removal |
+| `set_frame_correction:normalize=<0\|1>` | Enable or disable post-FFT frame correction (normalize each A-scan by the square root of its spectral average) |
 
 ### Dispersion Coefficients (`set_disp_coeff`)
 Each coefficient can be a double or `nullptr`/`null` to leave the respective coefficient unchanged.
@@ -145,7 +146,7 @@ Only specified keys are changed; omitted keys keep their current values.
 
 | Command | Description |
 |---------|-------------|
-| `set_bg_frame:enable=<0\|1>:bscans=<N>:mode=<subtraction\|normalize>` | Configure background-frame correction, the averaging count used when recording a new frame, and the correction mode. |
+| `set_bg_frame:enable=<0\|1>:bscans=<N>:mode=<subtraction\|normalize>:smooth=<0\|1>:smooth_window=<N>` | Configure background-frame correction, the averaging count used when recording a new frame, the correction mode, and background spectrum smoothing. |
 | `set_continuous_bg:enable=<0\|1>:ema=<0\|1>` | Configure continuous background estimation and select the averaging method. |
 | `record_bg_frame` | Record a new static background frame from the current acquisition. |
 | `load_bg_frame:<file_path>` | Load a previously saved background frame from disk. |
@@ -153,12 +154,17 @@ Only specified keys are changed; omitted keys keep their current values.
 | `clear_bg_frame` | Clear the stored background frame and disable background subtraction modes. |
 | `set_full_range:enable=<0\|1>` | Enable or disable full-range line-field processing output. |
 | `set_cc:enable=<0\|1>:center=<0-1>:width=<0-1>:keep_positive=<0\|1>` | Configure complex conjugate artifact removal. |
+| `set_frame_correction:normalize=<0\|1>` | Enable or disable post-FFT frame correction: each A-scan is divided by the square root of its spectral average, computed from the live raw frame before background subtraction (lateral flat-field, no recorded background required). |
 
 The optional `mode` key accepts `subtraction` for background subtraction only, or `normalize` for background subtraction and normalization. If omitted, the current correction mode is kept.
+
+The optional `smooth` key enables smoothing of each background spectrum with a rolling average filter before correction. `smooth_window` sets the filter half-width in samples (valid: 1-512, total window = 2*value+1).
 
 Examples:
 - `set_bg_frame:enable=1:bscans=10:mode=subtraction` - Enable background-frame subtraction and average 10 B-scans when recording a new frame.
 - `set_bg_frame:enable=1:mode=normalize` - Enable static background-frame subtraction and normalization while keeping the current averaging count.
+- `set_bg_frame:enable=1:smooth=1:smooth_window=10` - Enable background-frame subtraction with a smoothed background (rolling average, 21-sample window).
+- `set_frame_correction:normalize=1` - Enable post-FFT normalization by the average of each spectrum.
 - `set_continuous_bg:enable=1:ema=1` - Enable continuous background estimation and use the exponential moving average method.
 - `set_continuous_bg:enable=0` - Disable continuous background estimation and keep the current `ema` setting unchanged.
 - `record_bg_frame` - Record a new static background frame from the current acquisition.

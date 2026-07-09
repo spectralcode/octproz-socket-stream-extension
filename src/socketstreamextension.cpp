@@ -188,6 +188,9 @@ void SocketStreamExtension::handleRemoteCommand(QString command) {
 	else if (command.startsWith("set_cc", Qt::CaseInsensitive)) {
 		this->handleSetCcCommand(command);
 	}
+	else if (command.startsWith("set_frame_correction", Qt::CaseInsensitive)) {
+		this->handleSetFrameCorrectionCommand(command);
+	}
 	else if (command.startsWith("set_raw_only_mode", Qt::CaseInsensitive)) {
 		this->handleSetRawOnlyModeCommand(command);
 	}
@@ -606,6 +609,23 @@ void SocketStreamExtension::handleSetBgFrameCommand(const QString &command) {
 				return;
 			}
 		}
+		else if (it.key() == "smooth") {
+			bool smooth;
+			if (!this->parseBoolValue(it.value().toString(), smooth)) {
+				emit error("Invalid boolean value for set_bg_frame smooth: " + it.value().toString());
+				return;
+			}
+			params.insert("smooth", smooth);
+		}
+		else if (it.key() == "smooth_window") {
+			bool ok;
+			unsigned int window = it.value().toString().toUInt(&ok);
+			if (!ok || window < 1 || window > 512) {
+				emit error("Invalid set_bg_frame smooth_window (valid: 1-512): " + it.value().toString());
+				return;
+			}
+			params.insert("smooth_window", window);
+		}
 		else {
 			emit error("Unknown set_bg_frame parameter: " + it.key());
 			return;
@@ -707,6 +727,32 @@ void SocketStreamExtension::handleSetFullRangeCommand(const QString &command) {
 	}
 
 	emit appCommandRequest("set_full_range", params);
+}
+
+void SocketStreamExtension::handleSetFrameCorrectionCommand(const QString &command) {
+	QVariantMap rawParams;
+	QString errorMessage;
+	if (!this->parseKeyValueCommand(command, rawParams, errorMessage)) {
+		emit error("Invalid set_frame_correction command format: " + errorMessage);
+		return;
+	}
+
+	QVariantMap params;
+	for (auto it = rawParams.cbegin(); it != rawParams.cend(); ++it) {
+		if (it.key() != "normalize") {
+			emit error("Unknown set_frame_correction parameter: " + it.key());
+			return;
+		}
+
+		bool normalize;
+		if (!this->parseBoolValue(it.value().toString(), normalize)) {
+			emit error("Invalid boolean value for set_frame_correction normalize: " + it.value().toString());
+			return;
+		}
+		params.insert("normalize", normalize);
+	}
+
+	emit appCommandRequest("set_frame_correction", params);
 }
 
 void SocketStreamExtension::handleSetCcCommand(const QString &command) {

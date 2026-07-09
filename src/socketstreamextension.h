@@ -82,6 +82,7 @@ private:
 	void handleClearBgFrameCommand();
 	void handleSetFullRangeCommand(const QString &command);
 	void handleSetCcCommand(const QString &command);
+	void handleSetFrameCorrectionCommand(const QString &command);
 	void handleSetRawOnlyModeCommand(const QString &command);
 	void handleSetRawOnlyParamsCommand(const QString &command);
 	void handleSetNormalAcquisitionParamsCommand(const QString &command);
